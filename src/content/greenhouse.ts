@@ -4,6 +4,7 @@
 
 import type { OsdrStudy } from "../data/osdrTypes";
 import type { Event } from "../types";
+import { eventImageFor } from "./images";
 
 export const ISS_MOON_CAUTION =
   "Caution: results from the ISS or Earth labs may not match the Moon.";
@@ -36,6 +37,7 @@ export function buildGreenhouseEvent(study: OsdrStudy): Event {
       cost: "No plant oxygen or science bonus today",
       effects: {},
     },
+    image: eventImageFor("greenhouse"),
     realWorldNote: `${study.finding} See ${study.url}. ${ISS_MOON_CAUTION}`,
   };
 }

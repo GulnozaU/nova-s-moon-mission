@@ -3,6 +3,7 @@
     {
       "id": "rim",
       "name": "South pole ridge (rim)",
+      "imageSlot": "southPole",
       "illumination": {
         "summary": "High, near-constant sunlight on a polar ridge",
         "litFraction": null,
@@ -17,6 +18,7 @@
     {
       "id": "plain",
       "name": "Equatorial mare (plain)",
+      "imageSlot": "equatorial",
       "illumination": {
         "summary": "About half of the time (lunar day ≈ 29.5 Earth days)",
         "litFraction": 0.5,

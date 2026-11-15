@@ -4,6 +4,7 @@
  */
 
 import type { Event } from "../types";
+import { eventImageFor } from "./images";
 
 /** Non-storm events scheduled by seed onto free days. */
 export const STATIC_EVENTS: Event[] = [
@@ -13,6 +14,7 @@ export const STATIC_EVENTS: Event[] = [
     sourceBadge: "REFERENCE",
     explanation:
       "Fine Moon dust blew into the water cleaner. It may clog the machine.",
+    image: eventImageFor("dust"),
     optionA: {
       id: "clean-dust",
       label: "Clean it now",

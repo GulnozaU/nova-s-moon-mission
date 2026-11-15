@@ -7,6 +7,7 @@ import { warningFromCmeSpeed } from "../data/warning";
 import type { SpaceWeatherResult } from "../data/donkiTypes";
 import type { Event } from "../types";
 import type { StormEvent } from "../engine/types";
+import { eventImageFor } from "./images";
 
 export type BuiltStorm = {
   event: StormEvent & Event;
@@ -74,6 +75,7 @@ export function buildStormEvent(
       cost: "Exposure rises a lot",
       effects: { sheltered: false },
     },
+    image: eventImageFor("storm"),
     realWorldNote: `DONKI recorded flare ${flare.flrID} (${flare.classType}) on ${date}${weather.fastestCme ? ` with CME ${weather.fastestCme.activityID}` : ""}.`,
   };
 

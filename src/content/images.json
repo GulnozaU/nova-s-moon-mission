@@ -1,0 +1,65 @@
+{
+  "note": "Real NASA Image and Video Library assets (Section 4.5). No logo/insignia. Credits copied from each record. Do not imply NASA endorsement.",
+  "images": [
+    {
+      "slot": "title",
+      "id": "PIA13227",
+      "title": "The Earth from the Moon",
+      "credit": "Image: NASA/GSFC/Arizona State University",
+      "pageUrl": "https://images.nasa.gov/details-PIA13227",
+      "alt": "Earth rising above the gray, cratered surface of the Moon.",
+      "file": "/images/title-PIA13227.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/PIA13227/PIA13227~orig.jpg"
+    },
+    {
+      "slot": "storm",
+      "id": "GSFC_20171208_Archive_e001164",
+      "title": "X-class Solar Flare on March 29, 2014",
+      "credit": "Image: NASA/GSFC",
+      "pageUrl": "https://images.nasa.gov/details-GSFC_20171208_Archive_e001164",
+      "alt": "Bright X-class solar flare erupting from the Sun in extreme ultraviolet light.",
+      "file": "/images/storm-GSFC_20171208_Archive_e001164.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001164/GSFC_20171208_Archive_e001164~orig.jpg"
+    },
+    {
+      "slot": "southPole",
+      "id": "PIA00001",
+      "title": "South Pole Region of the Moon as Seen by Clementine",
+      "credit": "Image: NASA/JPL/USGS",
+      "pageUrl": "https://images.nasa.gov/details-PIA00001",
+      "alt": "Mosaic of the Moon's south polar region, showing many craters and dark basins.",
+      "file": "/images/southPole-PIA00001.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/PIA00001/PIA00001~medium.jpg"
+    },
+    {
+      "slot": "equatorial",
+      "id": "PIA00224",
+      "title": "Moon - Western Near Side",
+      "credit": "Image: NASA/JPL",
+      "pageUrl": "https://images.nasa.gov/details-PIA00224",
+      "alt": "Crescent view of the western near side of the Moon from the Galileo spacecraft.",
+      "file": "/images/equatorial-PIA00224.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/PIA00224/PIA00224~orig.jpg"
+    },
+    {
+      "slot": "dust",
+      "id": "AS17-145-22224",
+      "title": "Astronaut Eugene Cernan inside the lunar module on lunar surface after EVA",
+      "credit": "Image: NASA/JSC",
+      "pageUrl": "https://images.nasa.gov/details-AS17-145-22224",
+      "alt": "Apollo 17 astronaut Eugene Cernan inside the lunar module after a moonwalk, with lunar dust on his suit.",
+      "file": "/images/dust-AS17-145-22224.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/AS17-145-22224/AS17-145-22224~medium.jpg"
+    },
+    {
+      "slot": "greenhouse",
+      "id": "S71-51318",
+      "title": "Plant - Growth - Apollo 15 - Lunar Material - MSC",
+      "credit": "Image: NASA/JSC",
+      "pageUrl": "https://images.nasa.gov/details-S71-51318",
+      "alt": "Close view of lettuce, tomato, and citrus plants grown in a NASA test with lunar material.",
+      "file": "/images/greenhouse-S71-51318.jpg",
+      "sourceUrl": "https://images-assets.nasa.gov/image/S71-51318/S71-51318~medium.jpg"
+    }
+  ]
+}

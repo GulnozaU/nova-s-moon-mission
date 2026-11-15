@@ -85,6 +85,17 @@ export type EventOption = {
   effects: EventEffects;
 };
 
+/** NASA still shown first on a card (Section 4.5); credit sits under the picture. */
+export type EventImage = {
+  slot: string;
+  nasaId: string;
+  src: string;
+  alt: string;
+  /** Exact credit line from the Image Library record, e.g. "Image: NASA/…". */
+  credit: string;
+  pageUrl: string;
+};
+
 /** One daily event card (Section 5 / Prompt 3). */
 export type Event = {
   id: string;
@@ -96,6 +107,8 @@ export type Event = {
   optionB: EventOption;
   /** One accurate NASA-context sentence; omit unverified claims. */
   realWorldNote: string;
+  /** Real NASA picture + credit under it (Section 4.5). */
+  image?: EventImage;
   /** Present on storm cards built from DONKI (YYYY-MM-DD). */
   eventDate?: string;
   /** Flare-derived severity when this is a storm card. */

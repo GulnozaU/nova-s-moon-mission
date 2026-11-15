@@ -82,6 +82,19 @@ Confirmed against [NASA’s API PDF](https://images.nasa.gov/docs/images.nasa.go
 
 Run `npm run find-images` to print top candidates. Skip third-party copyright; never use the NASA logo/insignia. Chosen IDs go in `src/content/images.json` with files under `public/images/`.
 
+### Bundled NASA stills (chosen for clearest on-topic context)
+
+| Slot | NASA ID | Credit |
+| --- | --- | --- |
+| title | `PIA13227` | Image: NASA/GSFC/Arizona State University |
+| storm | `GSFC_20171208_Archive_e001164` | Image: NASA/GSFC |
+| southPole | `PIA00001` | Image: NASA/JPL/USGS |
+| equatorial | `PIA00224` | Image: NASA/JPL |
+| dust | `AS17-145-22224` | Image: NASA/JSC |
+| greenhouse | `S71-51318` | Image: NASA/JSC |
+
+Real data from NASA. This game is not made or endorsed by NASA.
+
 ## Spec
 
 See [SPEC.md](./SPEC.md) (and the PDF in the repo root).

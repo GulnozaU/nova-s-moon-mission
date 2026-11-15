@@ -14,3 +14,11 @@ export {
 } from "./greenhouse";
 export type { GreenhouseCard } from "./greenhouse";
 export { buildRadiationMattersCard } from "./radiation";
+export {
+  listNasaImages,
+  getNasaImage,
+  cardImageProps,
+  eventImageFor,
+  nasaImageReferenceLines,
+} from "./images";
+export type { ImageSlot, NasaImage, CardImageProps } from "./images";
