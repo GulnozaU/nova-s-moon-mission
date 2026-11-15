@@ -51,6 +51,8 @@ export type GameSession = {
   decisions: DayDecisions;
   todaysEvent: Event | null;
   lastResult: ApplyDayResult | null;
+  lastChoice: "A" | "B" | null;
+  lastDecisions: DayDecisions | null;
   deltas: ResourceDelta[];
   loadError: string | null;
   glossaryOpen: boolean;
@@ -153,6 +155,8 @@ export function useGameSession(): GameSession {
   const [decisions, setDecisions] = useState<DayDecisions>(defaultDecisions);
   const [todaysEvent, setTodaysEvent] = useState<Event | null>(null);
   const [lastResult, setLastResult] = useState<ApplyDayResult | null>(null);
+  const [lastChoice, setLastChoice] = useState<"A" | "B" | null>(null);
+  const [lastDecisions, setLastDecisions] = useState<DayDecisions | null>(null);
   const [deltas, setDeltas] = useState<ResourceDelta[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
@@ -201,8 +205,11 @@ export function useGameSession(): GameSession {
       setTodaysEvent(dayEvent);
       setDecisions(defaultDecisions());
       setLastResult(null);
+      setLastChoice(null);
+      setLastDecisions(null);
       setDeltas([]);
-      setPhase("base");
+      // Start on power trade-off — teaching choices is the core loop.
+      setPhase("power");
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Could not load NASA data.",
@@ -239,6 +246,8 @@ export function useGameSession(): GameSession {
       if (!state || !todaysEvent || !rng) return;
       const before = state;
       const result = applyDay(state, decisions, todaysEvent, choice, rng);
+      setLastDecisions({ ...decisions });
+      setLastChoice(choice);
       setLastResult(result);
       setDeltas(buildDeltas(before, result));
       setState(result.state);
@@ -265,8 +274,10 @@ export function useGameSession(): GameSession {
     setTodaysEvent(nextEvent);
     setDecisions(defaultDecisions());
     setLastResult(null);
+    setLastChoice(null);
+    setLastDecisions(null);
     setDeltas([]);
-    setPhase("base");
+    setPhase("power");
   }, [lastResult, schedule]);
 
   const replay = useCallback(() => {
@@ -279,6 +290,8 @@ export function useGameSession(): GameSession {
     setGreenhouseStudy(null);
     setTodaysEvent(null);
     setLastResult(null);
+    setLastChoice(null);
+    setLastDecisions(null);
     setDeltas([]);
     setLoadError(null);
     setAfterStormOpen(false);
@@ -306,6 +319,8 @@ export function useGameSession(): GameSession {
     decisions,
     todaysEvent,
     lastResult,
+    lastChoice,
+    lastDecisions,
     deltas,
     loadError,
     glossaryOpen,

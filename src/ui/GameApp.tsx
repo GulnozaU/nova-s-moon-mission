@@ -19,26 +19,26 @@ const TRAINING = [
     nasaSlot: "title" as const,
     lines: [
       { text: "Hello! I am Nova." },
-      { text: "You will walk me around the Moon base." },
-      { text: "Use arrows or WASD. Press SPACE near doors and tools." },
+      { text: "You only get a few power chips each day." },
+      { text: "Every job helps — and every job costs. Nothing is free." },
     ],
   },
   {
     art: ART.waterTower,
     nasaSlot: "greenhouse" as const,
     lines: [
-      { text: "Water and air can run out." },
-      { text: "The water cleaner saves water." },
-      { text: "The air maker needs power too." },
+      { text: "Power runs the water cleaner." },
+      { text: "The cleaner saves water. Water can make oxygen." },
+      { text: "If you skip the cleaner, tanks fall faster." },
     ],
   },
   {
     art: ART.iconSun,
     nasaSlot: "storm" as const,
     lines: [
-      { text: "Space weather can hurt the crew." },
-      { text: "NASA watches storms on the Sun." },
-      { text: "Shelter helps when storms arrive." },
+      { text: "NASA watches real storms on the Sun." },
+      { text: "Shelter keeps the crew safer — but you lose science that day." },
+      { text: "Stay out for science — risk goes up. That is a trade-off." },
     ],
   },
 ];
@@ -92,7 +92,7 @@ export function GameApp() {
               <DialogueBox
                 lines={[
                   { text: "Hello! I am Nova." },
-                  { text: "Walk me around the base — grab tools, water plants, run machines!" },
+                  { text: "Help me run this Moon base. Every choice helps — and costs." },
                 ]}
                 onDone={g.startTraining}
               />
@@ -237,6 +237,8 @@ export function GameApp() {
             deltas={g.deltas}
             event={g.todaysEvent}
             notes={g.lastResult.dayLog.notes}
+            decisions={g.lastDecisions ?? undefined}
+            choice={g.lastChoice}
             onContinue={g.continueAfterResult}
             onOpenGlossary={() => g.setGlossaryOpen(true)}
           />

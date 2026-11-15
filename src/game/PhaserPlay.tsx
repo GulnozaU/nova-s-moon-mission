@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DayDecisions } from "../engine/types";
 import type { Event, GameState } from "../types";
 import type { SpaceWeatherResult } from "../data/donkiTypes";
@@ -8,6 +8,7 @@ import { nasaImageForContext, nasaImageForDay } from "../content/imageForContext
 import { CardNasaImage } from "../ui/CardNasaImage";
 import { SourceBadge } from "../ui/SourceBadge";
 import { DecisionTeachCard } from "../ui/teach/DecisionTeachCard";
+import { PowerTradePanel } from "../ui/teach/PowerTradePanel";
 import { SpaceText } from "../ui/teach/SpaceText";
 import { isDaylight, sunBarLabel } from "../ui/teach/dayNight";
 import { plannedPowerCost } from "../ui/powerMath";
@@ -30,6 +31,10 @@ type Props = {
   onOpenGlossary: () => void;
 };
 
+/**
+ * Day loop centered on teaching trade-offs (challenge goal).
+ * Phaser world shows consequences; PowerTradePanel / DecisionTeachCard teach choices.
+ */
 export function PhaserPlay({
   state,
   weather,
@@ -43,6 +48,7 @@ export function PhaserPlay({
   onChoose,
   onOpenGlossary,
 }: Props) {
+  const [showBase, setShowBase] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<ReturnType<typeof createMoonGame> | null>(null);
   const latest = useRef({
@@ -81,8 +87,8 @@ export function PhaserPlay({
       getEvent: () => latest.current.event,
       getHint: () =>
         latest.current.mode === "choose"
-          ? "Pick A or B — they help and cost different things."
-          : "Click glowing tools and machines. Jobs stay on top.",
+          ? "Pick A or B — each helps and costs something different."
+          : "You cannot turn everything on. That is the trade-off.",
       patchDecisions: (patch) =>
         latest.current.onDecisions({ ...latest.current.decisions, ...patch }),
       setDecisions: (d) => latest.current.onDecisions(d),
@@ -91,16 +97,27 @@ export function PhaserPlay({
       choose: (c) => latest.current.onChoose(c),
       openGlossary: () => latest.current.onOpenGlossary(),
     };
+  });
 
+  useEffect(() => {
+    if (!showBase) {
+      gameRef.current?.destroy(true);
+      gameRef.current = null;
+      return;
+    }
     if (!hostRef.current || gameRef.current) return;
     gameRef.current = createMoonGame(hostRef.current);
-
     return () => {
       gameRef.current?.destroy(true);
       gameRef.current = null;
-      moonBridgeRef.current = null;
     };
-  }, []);
+  }, [showBase]);
+
+  // New day / mode: prefer trade-off panel, not empty walking
+  useEffect(() => {
+    if (mode === "choose") setShowBase(false);
+    if (mode === "power") setShowBase(false);
+  }, [mode, state.day]);
 
   const nasaStill = event
     ? nasaImageForContext(event.id, state.day)
@@ -118,11 +135,14 @@ export function PhaserPlay({
   const left = powerToday - spent;
   const jobs = jobRows(decisions);
   const dayLit = isDaylight(state.site, state.day);
+  const planning = mode === "explore" || mode === "power";
 
   return (
     <section className={`phaser-play ${dayLit ? "is-day" : "is-night"}`}>
       <div className="phaser-todo" aria-label="Today's jobs">
-        <strong>Today&apos;s jobs</strong>
+        <strong>
+          Day {state.day}/10 · Teach the trade-off · {sunBarLabel(state.site)}
+        </strong>
         <ul>
           {jobs.map((j) => (
             <li key={j.id} className={j.on ? "is-on" : ""}>
@@ -136,41 +156,76 @@ export function PhaserPlay({
         </ul>
         <p className="phaser-todo__power">
           Power {spent}/{powerToday}
-          {left < 0 ? " · too much!" : ` · left ${left}`} · {sunBarLabel(state.site)}
+          {left < 0 ? " · too much — turn something off!" : ` · left ${left}`}
         </p>
       </div>
 
-      <div className="phaser-play__body">
-        <div className="phaser-play__stage" ref={hostRef} />
+      <div className="phaser-play__body phaser-play__body--teach">
+        <div className="phaser-play__teach">
+          {planning ? (
+            <PowerTradePanel
+              decisions={decisions}
+              powerToday={powerToday}
+              onDecisions={onDecisions}
+              onOpenGlossary={onOpenGlossary}
+              onReady={onReadyForEvent}
+              onVisitBase={() => setShowBase(true)}
+            />
+          ) : null}
+
+          {mode === "choose" && event ? (
+            <DecisionTeachCard
+              event={event}
+              day={state.day}
+              onConfirm={onChoose}
+              onBack={onPlanPower}
+              onOpenGlossary={onOpenGlossary}
+            />
+          ) : null}
+
+          {showBase ? (
+            <div className="phaser-play__stage-wrap">
+              <div className="phaser-play__stage-bar">
+                <p>
+                  Base view — plants dry if you skip watering; machines glow when
+                  ON. Changes match your trade-off plan.
+                </p>
+                <button type="button" className="btn ghost" onClick={() => setShowBase(false)}>
+                  Back to trade-offs
+                </button>
+              </div>
+              <div className="phaser-play__stage" ref={hostRef} />
+            </div>
+          ) : (
+            <p className="phaser-hint">
+              Tip: tap <strong>See it on the base</strong> to walk around and
+              watch plants/machines match your plan — after you understand the
+              trade-off above.
+            </p>
+          )}
+        </div>
 
         <aside className="phaser-play__side">
           <div className="phaser-side-card">
-            <h3>How to play</h3>
-            <ol>
-              <li>
-                <strong>Click</strong> glowing tools and machines (mouse/cursor)
-              </li>
-              <li>
-                Grab shows next to your pointer (wrench / can / notebook)
-              </li>
-              <li>Watch plants: green = watered, brown = dry</li>
-              <li>Click yellow Day board when jobs look right</li>
-            </ol>
+            <h3>Why this game?</h3>
+            <p>
+              <SpaceText
+                text="Real Moon bases cannot run everything. Power, water, oxygen, and storm safety pull on each other. Every ON helps and costs."
+                onOpenDrawer={onOpenGlossary}
+              />
+            </p>
           </div>
 
           <div className="phaser-side-card">
-            <h3>Supplies</h3>
+            <h3>Supplies now</h3>
             <p>
               Water {state.water} · O₂ {state.oxygen} · Risk {state.exposure}/
-              {LOSE_EXPOSURE_AT} <SourceBadge badge="ASSUMPTION" />
+              {LOSE_EXPOSURE_AT}
             </p>
             <p>
               Site: {state.site === "rim" ? "sunny rim" : "darker plain"} ·{" "}
-              {dayLit ? "Daylight" : "Night"}
+              {dayLit ? "Daylight" : "Night"} <SourceBadge badge="ASSUMPTION" />
             </p>
-            {left < 0 ? (
-              <p className="warn">Too much power — turn something off.</p>
-            ) : null}
           </div>
 
           <div className="phaser-side-card">
@@ -181,38 +236,35 @@ export function PhaserPlay({
                 text={plainTalk(
                   event?.explanation ??
                     (dayLit
-                      ? "Sunny now — good time for careful outdoor work."
-                      : "Night on this site — solar panels make less power."),
+                      ? "Sunny now — panels help, but chips still run out."
+                      : "Night on this site — little solar power. Choices get harder."),
                 )}
                 onOpenDrawer={onOpenGlossary}
               />
             </p>
+            <details className="how-know">
+              <summary>How do we know?</summary>
+              <p>
+                {nasaStill.title} ({photo.nasaId}). {photo.credit}
+              </p>
+              <p>
+                Storm timing uses NASA DONKI. Plant cards use NASA OSDR studies.
+              </p>
+            </details>
           </div>
 
-          {mode === "choose" && event ? (
-            <div className="phaser-side-card phaser-side-card--choice">
-              <DecisionTeachCard
-                event={event}
-                day={state.day}
-                onConfirm={onChoose}
-                onBack={onPlanPower}
-                onOpenGlossary={onOpenGlossary}
+          <div className="phaser-side-card">
+            <h3>Weather (DONKI)</h3>
+            <p>
+              <SpaceText
+                text={plainTalk(
+                  `Sun activity ${weather.strongestFlare?.classType ?? "quiet"}. Real NASA storm data sets when storms hit your mission.`,
+                )}
+                onOpenDrawer={onOpenGlossary}
               />
-            </div>
-          ) : (
-            <div className="phaser-side-card">
-              <h3>Weather</h3>
-              <p>
-                <SpaceText
-                  text={plainTalk(
-                    `Sun activity is ${weather.strongestFlare?.classType ?? "quiet"}. NASA watches so crews can get ready.`,
-                  )}
-                  onOpenDrawer={onOpenGlossary}
-                />
-              </p>
-              <SourceBadge badge={weather.source} />
-            </div>
-          )}
+            </p>
+            <SourceBadge badge={weather.source} />
+          </div>
         </aside>
       </div>
     </section>
