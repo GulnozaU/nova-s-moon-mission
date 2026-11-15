@@ -1,22 +1,24 @@
-/** Storybook art under /public/art (local illustrations, not NASA stills). */
+/** Storybook art. Cutouts = white backdrop removed (transparent PNG). */
+
+const C = "/art/cutouts";
 
 export const ART = {
-  nova: "/art/nova-astronaut-boy.jpg",
-  novaGirlHelmet: "/art/astronaut-girl-with-helmet.jpg",
-  novaGirlGlasses: "/art/astronaut-girl-with-glasses.jpg",
+  nova: `${C}/nova-astronaut-boy.png`,
+  novaGirlHelmet: `${C}/astronaut-girl-with-helmet.png`,
+  novaGirlGlasses: `${C}/astronaut-girl-with-glasses.png`,
   lab: "/art/science-lab-nova-notebook.jpeg",
   bunks: "/art/crew-quarters-bunks.jpeg",
   greenhouseIn: "/art/greenhouse-interior.jpeg",
-  greenhouseDome: "/art/greenhouse-dome.jpeg",
-  habitatDome: "/art/habitat-dome.jpg",
-  cottage: "/art/stone-cottage-base.jpeg",
-  earthMoon: "/art/earth-from-moon.jpeg",
+  greenhouseDome: `${C}/greenhouse-dome.png`,
+  habitatDome: `${C}/habitat-dome.png`,
+  cottage: `${C}/stone-cottage-base.png`,
+  earthMoon: `${C}/earth-from-moon.png`,
   lunarSurface: "/art/lunar-surface-craters.jpeg",
-  rover: "/art/lunar-rover.jpeg",
-  panels: "/art/solar-panels.jpeg",
-  dish: "/art/satellite-dish-comms.jpeg",
-  waterTower: "/art/water-tower.jpeg",
-  crates: "/art/supply-crates.jpeg",
+  rover: `${C}/lunar-rover.png`,
+  panels: `${C}/solar-panels.png`,
+  dish: `${C}/satellite-dish-comms.png`,
+  waterTower: `${C}/water-tower.png`,
+  crates: `${C}/supply-crates.png`,
   iconBattery: "/art/battery.png",
   iconWater: "/art/droplet.png",
   iconLeaf: "/art/leaf.png",

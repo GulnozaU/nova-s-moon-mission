@@ -1,13 +1,9 @@
 import { CardNasaImage } from "./CardNasaImage";
-import { BaseScene } from "./BaseScene";
 import { DayResultView } from "./DayResult";
-import { EventCardView } from "./EventCard";
 import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
-import { PowerPanel } from "./PowerPanel";
-import { ResourceBars } from "./ResourceBars";
+import { MissionDashboard } from "./MissionDashboard";
 import { SourceBadge } from "./SourceBadge";
-import { WeatherCard } from "./WeatherCard";
 import { ART } from "./art";
 import { getNasaImage } from "../content/images";
 import { useGameSession } from "./useGameSession";
@@ -20,9 +16,9 @@ const TRAINING = [
     art: ART.panels,
   },
   {
-    title: "Water and air matter",
-    body: "Turn on the water cleaner and air maker, or tanks drop fast.",
-    art: ART.waterTower,
+    title: "Every choice has a trade-off",
+    body: "One button helps. The other costs. Read both before you tap.",
+    art: ART.iconShield,
   },
   {
     title: "Storms are real",
@@ -33,6 +29,8 @@ const TRAINING = [
 
 export function GameApp() {
   const g = useGameSession();
+  const dashMode =
+    g.phase === "power" ? "power" : g.phase === "event" ? "choose" : "explore";
 
   return (
     <div className="nova-app">
@@ -57,19 +55,27 @@ export function GameApp() {
       <main id="main" className="nova-main">
         {g.phase === "welcome" ? (
           <section className="screen welcome-screen">
-            <div className="welcome-hero" style={{ backgroundImage: `url(${ART.lunarSurface})` }}>
-              <img src={ART.nova} alt="Nova the young astronaut" className="welcome-hero__nova float-soft" />
+            <div
+              className="welcome-hero"
+              style={{ backgroundImage: `url(${ART.lunarSurface})` }}
+            >
+              <img
+                src={ART.nova}
+                alt="Nova the young astronaut"
+                className="welcome-hero__nova bounce"
+              />
+              <img src={ART.rover} alt="" className="actor actor--rover drive" style={{ position: "absolute" }} />
               <CardNasaImage slot="title" className="welcome-hero__nasa" />
             </div>
             <div className="welcome-copy">
               <p className="eyebrow">Real data from NASA</p>
               <h1>Help Nova run a Moon base for 10 days</h1>
               <p>
-                Spend power wisely, watch real space weather, and keep water, air, and
-                crew safety okay.
+                Watch the base move. Spend power. Then pick a choice where both the
+                help and the cost are written out loud.
               </p>
               <div className="panel__actions">
-                <button type="button" className="btn primary" onClick={g.startTraining}>
+                <button type="button" className="btn primary pulse" onClick={g.startTraining}>
                   Start training
                 </button>
                 <button type="button" className="btn ghost" onClick={g.openLegend}>
@@ -119,7 +125,7 @@ export function GameApp() {
         {g.phase === "site" ? (
           <section className="screen site-screen">
             <h2>Where should Nova build?</h2>
-            <p>Each place has a clear trade-off.</p>
+            <p>Each place has a written trade-off. Pick one.</p>
             <div className="site-grid">
               {g.siteRecords.map((site) => {
                 const slot = site.imageSlot as "southPole" | "equatorial";
@@ -135,19 +141,19 @@ export function GameApp() {
                     <h3>{site.name}</h3>
                     <p>{site.illumination.summary}</p>
                     <p className="site-card__trade">
-                      {site.id === "rim"
-                        ? "More steady power · less science each walk"
-                        : "More science · dark nights with little power"}
+                      {site.id === "rim" ? (
+                        <>
+                          <span className="helps">↑ Helps: steadier power</span>
+                          <span className="costs">↓ Costs: less science each walk</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="helps">↑ Helps: more science</span>
+                          <span className="costs">↓ Costs: dark nights, little power</span>
+                        </>
+                      )}
                     </p>
-                    <SourceBadge
-                      badge={
-                        ("powerBadge" in site.illumination
-                          ? site.illumination.powerBadge
-                          : "badge" in site.illumination
-                            ? site.illumination.badge
-                            : "ASSUMPTION") as "ASSUMPTION" | "REFERENCE"
-                      }
-                    />
+                    <SourceBadge badge="ASSUMPTION" />
                     <span className="btn primary">Build here · {nasa.id}</span>
                   </button>
                 );
@@ -158,9 +164,9 @@ export function GameApp() {
 
         {g.phase === "loading" ? (
           <section className="screen panel loading-screen" aria-busy="true">
-            <img src={ART.rover} alt="" className="bob" />
+            <img src={ART.rover} alt="" className="drive" />
             <h2>Talking to NASA data…</h2>
-            <p>Loading space weather and plant studies. This stays on your device — no login.</p>
+            <p>Loading space weather and plant studies. No login.</p>
           </section>
         ) : null}
 
@@ -180,64 +186,24 @@ export function GameApp() {
           </section>
         ) : null}
 
-        {g.phase === "base" && g.state && g.weather ? (
-          <section className="screen base-screen">
-            <div className="base-layout">
-              <BaseScene
-                site={g.state.site}
-                onOpenPower={g.goPower}
-                onOpenGreenhouse={() => {
-                  g.setDecisions((d) => ({ ...d, greenhouse: true }));
-                  g.goPower();
-                }}
-                onOpenComms={() => {
-                  g.setDecisions((d) => ({ ...d, comms: true }));
-                  g.goPower();
-                }}
-                onOpenGlossary={() => g.setGlossaryOpen(true)}
-              />
-              <aside className="base-side">
-                <div className="day-chip">
-                  Day {g.state.day} / 10
-                  <SourceBadge badge="ASSUMPTION" />
-                  <span className="day-chip__power">
-                    {g.powerToday} power today
-                    <SourceBadge badge="ASSUMPTION" />
-                  </span>
-                </div>
-                <ResourceBars state={g.state} />
-                <WeatherCard weather={g.weather} commsOn={g.decisions.comms} />
-                {g.todaysEvent ? (
-                  <article className="mini-event">
-                    <h3>Today&apos;s event</h3>
-                    <p>{g.todaysEvent.title}</p>
-                    <SourceBadge badge={g.todaysEvent.sourceBadge} />
-                  </article>
-                ) : null}
-                <button type="button" className="btn primary wide" onClick={g.goPower}>
-                  Assign today&apos;s power
-                </button>
-              </aside>
-            </div>
-          </section>
-        ) : null}
-
-        {g.phase === "power" && g.state ? (
-          <PowerPanel
+        {(g.phase === "base" || g.phase === "power" || g.phase === "event") &&
+        g.state &&
+        g.weather ? (
+          <MissionDashboard
             state={g.state}
-            powerPool={g.powerToday}
-            decisions={g.decisions}
-            onChange={g.setDecisions}
-            onBack={() => g.setPhase("base")}
-            onContinue={g.goEvent}
-          />
-        ) : null}
-
-        {g.phase === "event" && g.todaysEvent ? (
-          <EventCardView
+            weather={g.weather}
             event={g.todaysEvent}
+            decisions={g.decisions}
+            powerToday={g.powerToday}
+            mode={dashMode}
+            onDecisions={g.setDecisions}
+            onPlanPower={g.goPower}
+            onReadyForEvent={g.goEvent}
             onChoose={g.chooseEvent}
-            onBack={() => g.setPhase("power")}
+            onOpenGlossary={() => g.setGlossaryOpen(true)}
+            onBackExplore={() =>
+              g.setPhase(g.phase === "event" ? "power" : "base")
+            }
           />
         ) : null}
 
@@ -255,7 +221,7 @@ export function GameApp() {
             <img
               src={g.lastResult?.won ? ART.novaGirlHelmet : ART.novaGirlGlasses}
               alt=""
-              className="end-art bob"
+              className="end-art bounce"
             />
             <h2>{g.lastResult?.won ? "Mission complete!" : "Mission stopped"}</h2>
             <p>
@@ -266,15 +232,10 @@ export function GameApp() {
               Crew safety risk: <strong>{g.state.exposure.toFixed(1)}</strong>{" "}
               <SourceBadge badge="ASSUMPTION" />
             </p>
-            <p>
-              Seed {g.seed} · weather{" "}
-              <SourceBadge badge={g.weather?.source ?? "ARCHIVED"} />
-            </p>
             <ul className="end-log">
               {g.state.log.map((day) => (
                 <li key={day.day}>
-                  Day {day.day}: {day.eventId} → {day.choice} · science {day.science} ·
-                  water {day.water}
+                  Day {day.day}: {day.eventId} → {day.choice} · science {day.science}
                 </li>
               ))}
             </ul>
@@ -289,24 +250,40 @@ export function GameApp() {
           </section>
         ) : null}
 
-        {g.phase === "legend" ? (
-          <LegendScreen onBack={g.backFromLegend} />
-        ) : null}
+        {g.phase === "legend" ? <LegendScreen onBack={g.backFromLegend} /> : null}
       </main>
 
       {g.afterStormOpen && g.schedule?.radiationStudy ? (
-        <div className="drawer-backdrop" role="presentation" onClick={() => g.setAfterStormOpen(false)}>
-          <aside className="drawer" role="dialog" aria-label="Why radiation matters" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="drawer-backdrop"
+          role="presentation"
+          onClick={() => g.setAfterStormOpen(false)}
+        >
+          <aside
+            className="drawer"
+            role="dialog"
+            aria-label="Why radiation matters"
+            onClick={(e) => e.stopPropagation()}
+          >
             <header>
               <h2>Why radiation matters</h2>
-              <button type="button" className="btn ghost" onClick={() => g.setAfterStormOpen(false)}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => g.setAfterStormOpen(false)}
+              >
                 Close
               </button>
             </header>
             <p>
-              Study {g.schedule.radiationStudy.id}: {g.schedule.radiationStudy.finding}
+              Study {g.schedule.radiationStudy.id}:{" "}
+              {g.schedule.radiationStudy.finding}
             </p>
-            <a href={g.schedule.radiationStudy.url} target="_blank" rel="noreferrer">
+            <a
+              href={g.schedule.radiationStudy.url}
+              target="_blank"
+              rel="noreferrer"
+            >
               Open study
             </a>
           </aside>
