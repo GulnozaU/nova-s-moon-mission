@@ -1,5 +1,4 @@
 import { CardNasaImage } from "./CardNasaImage";
-import { DayResultView } from "./DayResult";
 import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
 import { PhaserPlay } from "../game/PhaserPlay";
@@ -10,6 +9,7 @@ import { useGameSession } from "./useGameSession";
 import { DialogueBox } from "./teach/DialogueBox";
 import { EndReport } from "./teach/EndReport";
 import { SpaceText } from "./teach/SpaceText";
+import type { PlayMode } from "../game/bridge";
 import "./game.css";
 
 /** One idea per screen — Nova says it; no duplicate body text. */
@@ -45,8 +45,21 @@ const TRAINING = [
 
 export function GameApp() {
   const g = useGameSession();
-  const dashMode =
-    g.phase === "power" ? "power" : g.phase === "event" ? "choose" : "explore";
+  const dashMode: PlayMode =
+    g.phase === "power"
+      ? "power"
+      : g.phase === "event"
+        ? "choose"
+        : g.phase === "result"
+          ? "result"
+          : "explore";
+  /** Keep one Phaser instance from Day 1 through the end report. */
+  const missionLive = Boolean(g.state && g.weather && g.phase !== "welcome");
+  const playVisible =
+    g.phase === "base" ||
+    g.phase === "power" ||
+    g.phase === "event" ||
+    g.phase === "result";
 
   const advanceTraining = () => {
     if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
@@ -213,9 +226,7 @@ export function GameApp() {
           </section>
         ) : null}
 
-        {(g.phase === "base" || g.phase === "power" || g.phase === "event") &&
-        g.state &&
-        g.weather ? (
+        {missionLive && g.state && g.weather ? (
           <PhaserPlay
             state={g.state}
             weather={g.weather}
@@ -223,23 +234,15 @@ export function GameApp() {
             decisions={g.decisions}
             powerToday={g.powerToday}
             mode={dashMode}
+            deltas={g.deltas}
+            stormAlerts={g.stormAlerts}
+            tomorrowHint={g.tomorrowHint}
+            visible={playVisible}
             onDecisions={g.setDecisions}
             onPlanPower={g.goPower}
             onReadyForEvent={g.goEvent}
             onChoose={g.chooseEvent}
-            onOpenGlossary={() => g.setGlossaryOpen(true)}
-          />
-        ) : null}
-
-        {g.phase === "result" && g.lastResult ? (
-          <DayResultView
-            result={g.lastResult}
-            deltas={g.deltas}
-            event={g.todaysEvent}
-            notes={g.lastResult.dayLog.notes}
-            decisions={g.lastDecisions ?? undefined}
-            choice={g.lastChoice}
-            onContinue={g.continueAfterResult}
+            onContinueAfterResult={g.continueAfterResult}
             onOpenGlossary={() => g.setGlossaryOpen(true)}
           />
         ) : null}

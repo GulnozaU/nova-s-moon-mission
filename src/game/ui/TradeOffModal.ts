@@ -48,6 +48,12 @@ const JOBS: Job[] = [
     cost: `−${COMMS_COST} power`,
   },
   {
+    key: "cleanFilter",
+    title: "Clean the filter",
+    help: "Unclog water cleaner",
+    cost: "−1 material −1 power",
+  },
+  {
     key: "greenhouse",
     title: "Water plants",
     help: "+O₂ +science",
@@ -218,7 +224,7 @@ export class TradeOffModal {
   private bigBtn(x: number, y: number, label: string, fn: () => void, fill: number) {
     const c = this.scene.add.container(x, y);
     const bg = this.scene.add
-      .rectangle(0, 0, 260, 34, fill)
+      .rectangle(0, 0, 280, 48, fill)
       .setStrokeStyle(2, THEME.line, 0.2)
       .setInteractive({ useHandCursor: true });
     const t = this.scene.add
@@ -229,22 +235,23 @@ export class TradeOffModal {
         fontStyle: "bold",
       })
       .setOrigin(0.5);
-    bg.on("pointerdown", fn);
-    c.add([bg, t]);
-    this.scene.tweens.add({
-      targets: c,
-      scale: 1.03,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.inOut",
+    bg.on("pointerover", () => bg.setScale(1.04));
+    bg.on("pointerout", () => bg.setScale(1));
+    bg.on("pointerdown", () => {
+      bg.setScale(0.96);
+      fn();
     });
+    bg.on("pointerup", () => bg.setScale(1.04));
+    c.add([bg, t]);
     return c;
   }
 
   private toggle(key: keyof DayDecisions) {
     const d = bridge().getDecisions();
     if (key === "scienceLevel" || key === "buildShield" || key === "buildPanel") return;
+    if (key === "cleanFilter" && !d.cleanFilter) {
+      if ((bridge().getState().recyclerEfficiency ?? 1) >= 1) return;
+    }
     bridge().patchDecisions({ [key]: !Boolean(d[key]) });
     this.refresh();
   }
@@ -288,11 +295,21 @@ export class TradeOffModal {
       );
       this.budgetText.setColor(left < 0 ? THEME.rose : THEME.sageInk);
       this.sciCount.setText(String(d.scienceLevel));
+      const clogged = (b.getState().recyclerEfficiency ?? 1) < 1;
       for (const row of this.rows) {
         if (row.job.forced) {
           row.onLabel.setText("ON");
           row.bg.setFillStyle(THEME.good, 0.55);
           continue;
+        }
+        if (row.job.key === "cleanFilter" && !clogged) {
+          row.onLabel.setText("ok");
+          row.bg.setFillStyle(THEME.panelAlt, 1);
+          row.bg.disableInteractive();
+          continue;
+        }
+        if (row.job.key === "cleanFilter" && clogged) {
+          row.bg.setInteractive({ useHandCursor: true });
         }
         const on = Boolean(d[row.job.key as keyof DayDecisions]);
         row.onLabel.setText(on ? "ON" : "off");

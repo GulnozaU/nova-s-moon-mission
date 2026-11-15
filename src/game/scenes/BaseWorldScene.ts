@@ -11,8 +11,10 @@ import {
 import { addShadow, idleBreathe, paintMoonGround, sparkBurst, walkHop } from "../anim";
 import { TradeOffModal } from "../ui/TradeOffModal";
 import { ChoiceModal } from "../ui/ChoiceModal";
+import { ConsequenceModal } from "../ui/ConsequenceModal";
 import { NasaFrame } from "../ui/NasaFrame";
 import { THEME } from "../theme";
+import { createRng } from "../../engine/rng";
 
 type Zone = {
   id: string;
@@ -40,8 +42,11 @@ export class BaseWorldScene extends Phaser.Scene {
   private walkSync!: () => void;
   private tradeModal!: TradeOffModal;
   private choiceModal!: ChoiceModal;
+  private consequenceModal!: ConsequenceModal;
   private nasaFrame!: NasaFrame;
   private lastMode = "";
+  private lastDay = -1;
+  private alertText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("base");
@@ -57,7 +62,15 @@ export class BaseWorldScene extends Phaser.Scene {
       /* */
     }
 
-    paintMoonGround(this, W, H, night);
+    {
+      let seed = 42;
+      try {
+        seed = bridge().getDay() * 7919 + (bridge().getState().site === "rim" ? 3 : 5);
+      } catch {
+        /* */
+      }
+      paintMoonGround(this, W, H, night, createRng(seed));
+    }
 
     // Soft photo wash for texture (not the whole UI)
     this.add
@@ -69,9 +82,17 @@ export class BaseWorldScene extends Phaser.Scene {
     if (!night) {
       this.add.ellipse(W * 0.85, H * 0.1, 90, 90, 0xffe08a, 0.55).setDepth(2);
     } else {
+      // Seed decorative stars from mission day so remounts don't reshuffle.
+      let seed = 1;
+      try {
+        seed = bridge().getDay() * 9973 + (bridge().getState().site === "rim" ? 1 : 2);
+      } catch {
+        /* */
+      }
+      const rng = createRng(seed);
       for (let i = 0; i < 20; i++) {
         this.add
-          .circle(Math.random() * W, Math.random() * H * 0.35, 1.2, 0xffffff, 0.8)
+          .circle(rng() * W, rng() * H * 0.35, 1.2, 0xffffff, 0.8)
           .setDepth(2);
       }
     }
@@ -145,16 +166,30 @@ export class BaseWorldScene extends Phaser.Scene {
     this.nasaFrame = new NasaFrame(this, W - 100, H * 0.38);
     this.tradeModal = new TradeOffModal(this);
     this.choiceModal = new ChoiceModal(this);
+    this.consequenceModal = new ConsequenceModal(this);
 
-    // Start with trade-off open (teaching first)
+    this.alertText = this.add
+      .text(W / 2, 52, "", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "14px",
+        color: "#fff8ef",
+        backgroundColor: "#c98b7b",
+        padding: { x: 10, y: 6 },
+        align: "center",
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(71)
+      .setScrollFactor(0)
+      .setVisible(false);
+
+    // Start with trade-off open (teaching first) once bridge is ready
     this.time.delayedCall(200, () => {
-      try {
-        const mode = bridge().getMode();
-        if (mode === "power" || mode === "explore") this.tradeModal.show();
-        if (mode === "choose") this.choiceModal.show();
-      } catch {
-        /* */
-      }
+      if (!bridge().ready()) return;
+      const mode = bridge().getMode();
+      if (mode === "power" || mode === "explore") this.tradeModal.show();
+      if (mode === "choose") this.choiceModal.show();
+      if (mode === "result") this.consequenceModal.show();
+      this.refreshAlerts();
     });
   }
 
@@ -357,30 +392,65 @@ export class BaseWorldScene extends Phaser.Scene {
     }
   }
 
+  private refreshAlerts() {
+    if (!this.alertText || !bridge().ready()) return;
+    const alerts = bridge().getStormAlerts();
+    if (alerts.length === 0) {
+      this.alertText.setVisible(false);
+      return;
+    }
+    this.alertText.setText(alerts.map((a) => a.message).join(" · "));
+    this.alertText.setVisible(true);
+  }
+
   update() {
     if (!this.player?.body) return;
+    if (!bridge().ready()) return;
 
-    // React to mode changes from the shell
-    try {
-      const mode = bridge().getMode();
-      if (mode !== this.lastMode) {
-        this.lastMode = mode;
-        if (mode === "choose") {
-          this.tradeModal.hide();
-          this.choiceModal.show();
-        } else if (mode === "power") {
-          this.choiceModal.hide();
-          this.tradeModal.show();
-        }
+    // React to mode / day changes from the shell (no remount needed)
+    const mode = bridge().getMode();
+    const day = bridge().getDay();
+    // Soft day rollover without destroying the Phaser.Game (repaint sky/ground).
+    if (this.lastDay > 0 && day !== this.lastDay && mode === "power") {
+      this.lastDay = day;
+      this.lastMode = "";
+      this.scene.restart();
+      return;
+    }
+    if (day !== this.lastDay) {
+      this.lastDay = day;
+      this.refreshAlerts();
+    }
+    if (mode !== this.lastMode) {
+      this.lastMode = mode;
+      if (mode === "choose") {
+        this.tradeModal.hide();
+        this.consequenceModal.hide();
+        this.choiceModal.show();
+      } else if (mode === "power") {
+        this.choiceModal.hide();
+        this.consequenceModal.hide();
+        this.tradeModal.show();
+        this.refreshAlerts();
+      } else if (mode === "result") {
+        this.tradeModal.hide();
+        this.choiceModal.hide();
+        this.consequenceModal.show();
       }
-    } catch {
-      /* */
     }
 
-    if (this.tradeModal.isOpen() || this.choiceModal.isOpen()) {
+    if (
+      this.tradeModal.isOpen() ||
+      this.choiceModal.isOpen() ||
+      this.consequenceModal.isOpen()
+    ) {
       this.player.setVelocity(0, 0);
       this.refreshHud();
-      this.prompt.setText("Finish the card · or Walk the base");
+      this.prompt.setText(
+        this.consequenceModal.isOpen()
+          ? "See what changed · Next day"
+          : "Finish the card · or Walk the base",
+      );
       return;
     }
 
@@ -408,7 +478,13 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   private tryInteract() {
-    if (this.tradeModal.isOpen() || this.choiceModal.isOpen()) return;
+    if (
+      this.tradeModal.isOpen() ||
+      this.choiceModal.isOpen() ||
+      this.consequenceModal.isOpen()
+    ) {
+      return;
+    }
     if (!this.near) {
       this.tradeModal.show();
       return;

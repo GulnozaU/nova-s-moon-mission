@@ -69,7 +69,13 @@ export function sparkBurst(scene: Phaser.Scene, x: number, y: number, color = 0x
 }
 
 /** Soft painted moon ground (smooth 2D, not pixel). */
-export function paintMoonGround(scene: Phaser.Scene, w: number, h: number, night: boolean) {
+export function paintMoonGround(
+  scene: Phaser.Scene,
+  w: number,
+  h: number,
+  night: boolean,
+  rng: () => number = Math.random,
+) {
   const skyTop = night ? 0x2a3348 : 0x9eb6c9;
   const skyBot = night ? 0x4a4558 : 0xd5c4b0;
   const g = scene.add.graphics().setDepth(0);
@@ -81,9 +87,9 @@ export function paintMoonGround(scene: Phaser.Scene, w: number, h: number, night
   g.fillRect(0, groundY, w, h - groundY);
 
   for (let i = 0; i < 18; i++) {
-    const cx = 40 + Math.random() * (w - 80);
-    const cy = groundY + 40 + Math.random() * (h - groundY - 80);
-    const r = 8 + Math.random() * 22;
+    const cx = 40 + rng() * (w - 80);
+    const cy = groundY + 40 + rng() * (h - groundY - 80);
+    const r = 8 + rng() * 22;
     g.fillStyle(night ? 0x3a3548 : 0xb8a898, 0.5);
     g.fillCircle(cx, cy, r);
   }

@@ -108,18 +108,24 @@ export class ChoiceModal {
   private actionBtn(x: number, y: number, text: string, fn: () => void, fill: number) {
     const c = this.scene.add.container(x, y);
     const bg = this.scene.add
-      .rectangle(0, 0, 200, 32, fill)
+      .rectangle(0, 0, 220, 48, fill)
       .setStrokeStyle(2, THEME.line, 0.2)
       .setInteractive({ useHandCursor: true });
     const t = this.scene.add
       .text(0, 0, text, {
         fontFamily: THEME.fontDisplay,
-        fontSize: "14px",
+        fontSize: "15px",
         color: THEME.ink,
         fontStyle: "bold",
       })
       .setOrigin(0.5);
-    bg.on("pointerdown", fn);
+    bg.on("pointerover", () => bg.setScale(1.04));
+    bg.on("pointerout", () => bg.setScale(1));
+    bg.on("pointerdown", () => {
+      bg.setScale(0.96);
+      if (!bridge().ready()) return;
+      fn();
+    });
     c.add([bg, t]);
     return c;
   }
@@ -147,11 +153,13 @@ export class ChoiceModal {
       `${plainTalk(event.explanation)}\n\nA and B are different — read ↑ and ↓.`,
     );
     this.labelA.setText(
-      `A · ${event.optionA.label}\n↑ ${plainTalk(event.optionA.benefit)}\n↓ ${plainTalk(event.optionA.cost)}`,
+      `A · ${event.optionA.label}\n↑ ${plainTalk(event.optionA.benefit)}\n↓ ${plainTalk(event.optionA.cost)}\n(Confirm to apply)`,
     );
     this.labelB.setText(
-      `B · ${event.optionB.label}\n↑ ${plainTalk(event.optionB.benefit)}\n↓ ${plainTalk(event.optionB.cost)}`,
+      `B · ${event.optionB.label}\n↑ ${plainTalk(event.optionB.benefit)}\n↓ ${plainTalk(event.optionB.cost)}\n(Confirm to apply)`,
     );
+    this.labelA.setColor(THEME.ink);
+    this.labelB.setColor(THEME.ink);
 
     try {
       const img = nasaImageForContext(event.id, bridge().getDay());

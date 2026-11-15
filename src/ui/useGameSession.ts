@@ -12,7 +12,9 @@ import type { SpaceWeatherResult } from "../data/donkiTypes";
 import type { OsdrStudy } from "../data/osdrTypes";
 import {
   scheduleMissionEvents,
+  stormAlertsForDay,
   type MissionSchedule,
+  type StormAlert,
 } from "../content/schedule";
 import type { Event, GameState, SiteId, SourceBadge } from "../types";
 import { defaultDecisions } from "./powerMath";
@@ -59,6 +61,8 @@ export type GameSession = {
   afterStormOpen: boolean;
   powerToday: number;
   generationToday: number;
+  stormAlerts: StormAlert[];
+  tomorrowHint: string;
   setPhase: (p: Phase) => void;
   setTrainingStep: (n: number) => void;
   setDecisions: (d: DayDecisions | ((prev: DayDecisions) => DayDecisions)) => void;
@@ -231,6 +235,36 @@ export function useGameSession(): GameSession {
     return baseGeneration(state.site, state.day) + state.panelBonus;
   }, [state]);
 
+  /** Alerts use today's Comms decision + full CME warning days. */
+  const stormAlerts = useMemo(() => {
+    if (!schedule || !state) return [];
+    return stormAlertsForDay(schedule, state.day, decisions.comms);
+  }, [schedule, state, decisions.comms]);
+
+  const tomorrowHint = useMemo(() => {
+    if (!state) return "";
+    if (state.water < 12) {
+      return "Water is low. Turn on the cleaner or you may run out soon.";
+    }
+    if (state.oxygen < 10) {
+      return "Air is low. Run the air maker tomorrow.";
+    }
+    if (state.exposure > 30) {
+      return "Crew risk is high. Shelter if a storm comes.";
+    }
+    if ((state.recyclerEfficiency ?? 1) < 1) {
+      return "The water filter is clogged. Clean it with 1 material.";
+    }
+    if (schedule) {
+      const nextStorm = schedule.storms.find((s) => s.day > state.day);
+      if (nextStorm) {
+        const n = nextStorm.day - state.day;
+        return `A storm may hit in ${n} day${n === 1 ? "" : "s"}. Keep Comms on.`;
+      }
+    }
+    return "Plan tomorrow's power. Every job helps and costs.";
+  }, [state, schedule]);
+
   const bootstrapMission = useCallback(async (chosen: SiteId, nextSeed: number) => {
     setPhase("loading");
     setLoadError(null);
@@ -317,7 +351,10 @@ export function useGameSession(): GameSession {
     const stormSlot = schedule.days.find(
       (d) => d.day === lastResult.dayLog.day,
     );
-    if (stormSlot?.afterStormCard && lastResult.dayLog.eventId === "solar-storm") {
+    if (
+      stormSlot?.afterStormCard &&
+      lastResult.dayLog.eventId.startsWith("solar-storm")
+    ) {
       setAfterStormOpen(true);
     }
     const nextDay = lastResult.state.day;
@@ -379,6 +416,8 @@ export function useGameSession(): GameSession {
     afterStormOpen,
     powerToday,
     generationToday,
+    stormAlerts,
+    tomorrowHint,
     setPhase,
     setTrainingStep,
     setDecisions,

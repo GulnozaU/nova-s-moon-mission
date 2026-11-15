@@ -11,6 +11,16 @@
   box-shadow: 0 14px 28px rgba(58, 51, 72, 0.18);
 }
 
+.phaser-play--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  pointer-events: none;
+  opacity: 0;
+}
+
 .phaser-play__canvas {
   position: relative;
   width: 100%;
