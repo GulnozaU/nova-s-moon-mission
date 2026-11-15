@@ -1,393 +1,55 @@
-.phaser-play {
+/* Smooth 2D stage — matches Baloo/Nunito storybook UI, not pixel */
+.phaser-play--fullscreen {
   display: grid;
-  gap: 0.55rem;
-  min-height: calc(100vh - 5.5rem);
-}
-
-.phaser-todo {
-  background: #fff8ef;
-  border: 3px solid #1c2a3a;
-  border-radius: 16px;
-  padding: 0.55rem 0.75rem 0.65rem;
-  box-shadow: 0 4px 0 rgba(28, 42, 58, 0.18);
-}
-
-.phaser-todo strong {
-  display: block;
-  font-family: var(--font-display, Georgia, serif);
-  font-size: 1.05rem;
-  margin-bottom: 0.35rem;
-}
-
-.phaser-todo ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.3rem 0.55rem;
-}
-
-.phaser-todo li {
-  display: flex;
+  grid-template-rows: 1fr auto;
   gap: 0.35rem;
-  align-items: flex-start;
-  font-size: 0.82rem;
-  font-weight: 750;
-  padding: 0.3rem 0.45rem;
-  border-radius: 10px;
-  background: #f3ebe0;
-  border: 1px solid #d9cbb8;
-}
-
-.phaser-todo li.is-on {
-  background: #d9f5e5;
-  border-color: #0b6b4f;
-}
-
-.phaser-todo li em {
-  font-style: normal;
-  opacity: 0.7;
-  font-weight: 650;
-}
-
-.phaser-todo__power {
-  margin: 0.45rem 0 0;
-  font-weight: 800;
-  font-size: 0.88rem;
-}
-
-.phaser-play__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) min(320px, 34vw);
-  gap: 0.75rem;
-  align-items: stretch;
-  min-height: 0;
-}
-
-.phaser-play__body--teach .phaser-play__teach {
-  display: grid;
-  gap: 0.65rem;
-  min-width: 0;
-}
-
-.phaser-hint {
-  margin: 0;
-  padding: 0.55rem 0.75rem;
-  background: #fff8ef;
-  border: 2px dashed #1c2a3a;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-
-.phaser-play__stage-wrap {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.phaser-play__stage-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: space-between;
-  background: #fff8ef;
-  border: 2px solid #1c2a3a;
-  border-radius: 12px;
-  padding: 0.45rem 0.65rem;
-}
-
-.phaser-play__stage-bar p {
-  margin: 0;
-  font-weight: 750;
-  font-size: 0.88rem;
-  flex: 1;
-}
-
-.trade-panel {
-  background: #fff8ef;
-  border: 3px solid #1c2a3a;
-  border-radius: 18px;
-  padding: 0.85rem 1rem 1rem;
-  box-shadow: 0 6px 0 rgba(28, 42, 58, 0.15);
-}
-
-.trade-panel__head h2 {
-  margin: 0.2rem 0 0.35rem;
-  font-family: var(--font-display, Georgia, serif);
-  font-size: 1.35rem;
-}
-
-.trade-panel__head p {
-  margin: 0.25rem 0;
-  font-weight: 750;
-}
-
-.trade-panel__budget {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0.65rem 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: 12px;
-  background: #1c2a3a;
-  color: #fff8ef;
-  font-weight: 800;
-}
-
-.trade-panel__budget .is-bad {
-  color: #ffb4b4;
-}
-
-.trade-panel__budget .is-ok {
-  color: #b8ffd0;
-}
-
-.trade-chain {
-  margin: 0 0 0.65rem;
-  padding: 0.55rem 0.7rem;
-  border-radius: 12px;
-  background: #ffe8b8;
-  border: 1px solid #c98a2c;
-  font-weight: 750;
-  font-size: 0.9rem;
-}
-
-.trade-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.45rem;
-}
-
-.job-card {
-  display: grid;
-  grid-template-columns: 36px 1fr auto;
-  gap: 0.4rem;
-  align-items: center;
-  text-align: left;
-  padding: 0.55rem;
-  border-radius: 12px;
-  border: 2px solid #1c2a3a;
-  background: #f3ebe0;
-  font: inherit;
-  cursor: pointer;
-  color: inherit;
-}
-
-.job-card img {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-}
-
-.job-card strong {
-  display: block;
-  font-size: 0.92rem;
-}
-
-.job-card .helps {
-  display: block;
-  color: #0b6b4f;
-  font-weight: 800;
-  font-size: 0.78rem;
-}
-
-.job-card .costs {
-  display: block;
-  color: #9b1c1c;
-  font-weight: 800;
-  font-size: 0.78rem;
-}
-
-.job-card em {
-  font-style: normal;
-  font-weight: 900;
-  font-size: 0.75rem;
-}
-
-.job-card.is-on {
-  background: #d9f5e5;
-  border-color: #0b6b4f;
-}
-
-.job-card.is-forced {
-  cursor: default;
-  background: #e8e0d4;
-}
-
-.job-card--science {
-  grid-column: 1 / -1;
-  cursor: default;
-}
-
-.science-stepper {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-  margin-top: 0.25rem;
-}
-
-.science-stepper button {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
-  border: 2px solid #1c2a3a;
-  background: #fff8ef;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.trade-lesson {
-  margin: 0.65rem 0;
-  font-weight: 800;
-}
-
-.trade-lesson.is-bad {
-  color: #9b1c1c;
-}
-
-.trade-result {
-  background: #ffe8b8;
-  border: 2px solid #c98a2c;
-  border-radius: 14px;
-  padding: 0.7rem 0.85rem;
-  margin-bottom: 0.75rem;
-}
-
-.trade-result h3 {
-  margin: 0 0 0.35rem;
-}
-
-.phaser-play__stage {
-  position: relative;
-  min-height: 520px;
+  min-height: calc(100vh - 4.5rem);
+  background: linear-gradient(180deg, #d5e0ea, #cfc3b4);
   border-radius: 20px;
   overflow: hidden;
-  border: 3px solid #1c2a3a;
-  box-shadow: 0 10px 0 rgba(42, 36, 28, 0.2);
-  background: #1a1520;
+  border: 2px solid rgba(58, 51, 72, 0.14);
+  box-shadow: 0 14px 28px rgba(58, 51, 72, 0.18);
 }
 
-.phaser-play.is-night .phaser-play__stage {
-  box-shadow: 0 10px 0 rgba(10, 16, 32, 0.45);
+.phaser-play__canvas {
+  position: relative;
+  width: 100%;
+  min-height: min(70vh, 560px);
+  background: #9eb6c9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.phaser-play__stage canvas {
+.phaser-play__canvas canvas {
   display: block;
-  width: 100% !important;
-  height: 100% !important;
+  image-rendering: auto;
+  max-width: 100%;
+  max-height: min(70vh, 560px);
+  border-radius: 4px;
 }
 
-.phaser-play__side {
-  display: grid;
-  gap: 0.55rem;
-  align-content: start;
-  max-height: calc(100vh - 10rem);
-  overflow: auto;
-}
-
-.phaser-side-card {
-  background: #fff8ef;
-  border: 2px solid #1c2a3a;
-  border-radius: 16px;
-  padding: 0.75rem 0.85rem;
-  box-shadow: 0 4px 0 rgba(42, 36, 28, 0.15);
-}
-
-.phaser-side-card h3 {
-  margin: 0 0 0.4rem;
-  font-family: var(--font-display, Georgia, serif);
-  font-size: 1.05rem;
-}
-
-.phaser-side-card ol {
+.phaser-play__hint {
   margin: 0;
-  padding-left: 1.15rem;
+  padding: 0.45rem 0.85rem 0.55rem;
+  text-align: center;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.85rem;
   font-weight: 700;
-  font-size: 0.88rem;
-  line-height: 1.35;
+  color: #3a3348;
+  background: #fff8ef;
 }
 
-.phaser-side-card p {
-  margin: 0.35rem 0;
-  font-weight: 700;
-  font-size: 0.9rem;
+.nova-main:has(.phaser-play--fullscreen) {
+  max-width: none;
+  padding-inline: 0.5rem;
 }
 
-.phaser-side-card__photo img {
-  width: 100%;
-  border-radius: 10px;
-  border: 1px solid #1c2a3a;
-}
-
-.phaser-side-card--choice {
-  padding: 0.4rem;
-}
-
-.phaser-side-card--choice .teach-card {
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: 0.35rem;
-}
-
-.phaser-side-card .warn {
-  color: #9b1c1c;
-  font-weight: 800;
-}
-
-.trade-btn {
-  display: grid;
-  gap: 0.35rem;
-  text-align: left;
-  width: 100%;
-  padding: 0.7rem 0.75rem;
-  border-radius: 14px;
-  border: 2px solid #1c2a3a;
-  background: #f3ebe0;
-  font: inherit;
-  cursor: pointer;
-}
-
-.trade-btn.is-picked {
-  background: #ffe8b8;
-  box-shadow: 0 0 0 3px rgba(240, 193, 74, 0.45);
-}
-
-.trade-btn .helps {
-  color: #0b6b4f;
-  font-weight: 800;
-  font-size: 0.88rem;
-}
-
-.trade-btn .costs {
-  color: #9b1c1c;
-  font-weight: 800;
-  font-size: 0.88rem;
-}
-
-.trade-btn--safe {
-  border-color: #0b6b4f;
-}
-
-.trade-btn--risky {
-  border-color: #9b1c1c;
-}
-
-.trade-options {
-  display: grid;
-  gap: 0.55rem;
-}
-
-@media (max-width: 960px) {
-  .phaser-play__body {
-    grid-template-columns: 1fr;
+@media (max-width: 700px) {
+  .phaser-play__canvas {
+    min-height: 52vh;
   }
-  .phaser-play__stage {
-    min-height: 48vh;
-  }
-  .phaser-play__side {
-    max-height: none;
+  .phaser-play__canvas canvas {
+    max-height: 52vh;
   }
 }

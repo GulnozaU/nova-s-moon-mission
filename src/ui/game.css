@@ -902,6 +902,15 @@ button.actor {
 }
 .delta.up { color: #3f7a4f; font-weight: 800; }
 .delta.down { color: #a85a48; font-weight: 800; }
+.day-result__nasa {
+  margin: 0 0 0.75rem;
+  max-width: 420px;
+}
+.day-result__nasa img {
+  width: 100%;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+}
 .day-result__banner {
   margin-top: 0.8rem;
   padding: 0.7rem;

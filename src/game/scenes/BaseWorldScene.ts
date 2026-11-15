@@ -1,41 +1,47 @@
 import Phaser from "phaser";
 import { bridge } from "../bridge";
-import { jobRows } from "../jobsHud";
 import { isDaylight } from "../../ui/teach/dayNight";
+import { plannedPowerCost } from "../../ui/powerMath";
 import {
   actionJustPressed,
   applyMovement,
   makeKeys,
   type ControlKeys,
 } from "../playerControls";
-import { plannedPowerCost } from "../../ui/powerMath";
+import { addShadow, idleBreathe, paintMoonGround, sparkBurst, walkHop } from "../anim";
+import { TradeOffModal } from "../ui/TradeOffModal";
+import { ChoiceModal } from "../ui/ChoiceModal";
+import { NasaFrame } from "../ui/NasaFrame";
+import { THEME } from "../theme";
 
 type Zone = {
   id: string;
-  kind: "door" | "prop" | "board";
+  kind: "door" | "board" | "prop";
   label: string;
   room?: "home" | "greenhouse" | "lab";
   x: number;
   y: number;
-  w: number;
-  h: number;
+  r: number;
   onUse?: () => void;
-  hit?: Phaser.GameObjects.Zone | Phaser.GameObjects.Rectangle;
 };
 
+/**
+ * Outdoor Moon base — clean 2D adventure space (Henry-farm style).
+ */
 export class BaseWorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private keys: ControlKeys | null = null;
   private zones: Zone[] = [];
   private near: Zone | null = null;
-  private prompt!: Phaser.GameObjects.Text;
-  private jobsBar!: Phaser.GameObjects.Text;
-  private novaBubble!: Phaser.GameObjects.Text;
-  private siteBanner!: Phaser.GameObjects.Text;
-  private nightOverlay!: Phaser.GameObjects.Rectangle;
-  private sunGlow!: Phaser.GameObjects.Ellipse;
   private pad = { x: 0, y: 0 };
-  private crew: Phaser.GameObjects.Image[] = [];
+  private prompt!: Phaser.GameObjects.Text;
+  private hud!: Phaser.GameObjects.Text;
+  private shadowSync!: () => void;
+  private walkSync!: () => void;
+  private tradeModal!: TradeOffModal;
+  private choiceModal!: ChoiceModal;
+  private nasaFrame!: NasaFrame;
+  private lastMode = "";
 
   constructor() {
     super("base");
@@ -43,193 +49,116 @@ export class BaseWorldScene extends Phaser.Scene {
 
   create() {
     const { width: W, height: H } = this.scale;
-    this.cameras.main.setBackgroundColor(0x1a1520);
-
-    this.add.image(W / 2, H / 2, "surface").setDisplaySize(W, H).setAlpha(0.92);
-    this.add
-      .rectangle(W / 2, H * 0.68, W * 0.94, H * 0.48, 0xc4b59a, 0.18)
-      .setStrokeStyle(2, 0x8a7a62, 0.35);
-
-    this.sunGlow = this.add
-      .ellipse(W * 0.82, H * 0.12, 160, 160, 0xffe08a, 0.35)
-      .setDepth(1);
-    this.nightOverlay = this.add
-      .rectangle(W / 2, H / 2, W, H, 0x0a1020, 0)
-      .setDepth(5)
-      .setScrollFactor(0);
-
-    this.add.image(W * 0.12, H * 0.16, "earth").setDisplaySize(100, 100).setDepth(2);
-
-    this.zones = [];
-    this.makeDoor("home", "Crew home\n(fix machines)", W * 0.2, H * 0.46, "habitat", 150, 120);
-    this.makeDoor(
-      "greenhouse",
-      "Greenhouse\n(water plants)",
-      W * 0.5,
-      H * 0.4,
-      "greenhouse",
-      140,
-      120,
-    );
-    this.makeDoor("lab", "Science lab\n(plan walks)", W * 0.78, H * 0.46, "labCottage", 140, 120);
-
-    this.makeProp("panels", "Solar panels", W * 0.34, H * 0.7, "panels", 120, 70, () =>
-      this.say(this.lit() ? "Panels are humming — sunny power!" : "Panels are dim — little power at night."),
-    );
-    this.makeProp("dish", "Earth dish", W * 0.62, H * 0.68, "dish", 88, 88, () =>
-      this.say("Turn on Talk to Earth inside Crew home for better storm warnings."),
-    );
-    this.makeProp("rover", "Rover", W * 0.88, H * 0.7, "rover", 110, 70, () =>
-      this.say("Rover helps science walks. Plan walks in the lab."),
-    );
-
-    this.makeBoard(W * 0.5, H * 0.8);
-    this.spawnCrew(W, H);
-
-    this.player = this.physics.add
-      .sprite(W * 0.5, H * 0.72, "nova")
-      .setDisplaySize(64, 84)
-      .setCollideWorldBounds(true)
-      .setDepth(12);
-    this.player.body!.setSize(40, 30);
-    this.player.body!.setOffset(12, 50);
-    this.physics.world.setBounds(20, H * 0.3, W - 40, H * 0.58);
-
-    this.keys = makeKeys(this);
-    this.buildTouchPad();
-
-    this.jobsBar = this.add
-      .text(W / 2, 6, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "13px",
-        color: "#1c2a3a",
-        backgroundColor: "#fff8ef",
-        padding: { x: 10, y: 6 },
-        align: "center",
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(60)
-      .setScrollFactor(0);
-
-    this.siteBanner = this.add
-      .text(W / 2, 48, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "14px",
-        color: "#fff8ef",
-        backgroundColor: "#1c2a3acc",
-        padding: { x: 10, y: 4 },
-      })
-      .setOrigin(0.5)
-      .setDepth(60)
-      .setScrollFactor(0);
-
-    this.novaBubble = this.add
-      .text(14, 78, "Click a glowing door to go inside. Jobs list stays on top.", {
-        fontFamily: "Georgia, serif",
-        fontSize: "14px",
-        color: "#1c2a3a",
-        backgroundColor: "#fff8ef",
-        padding: { x: 10, y: 8 },
-        wordWrap: { width: 300 },
-      })
-      .setDepth(60)
-      .setScrollFactor(0);
-
-    this.prompt = this.add
-      .text(W / 2, H - 20, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "14px",
-        color: "#1c2a3a",
-        backgroundColor: "#ffe8b8",
-        padding: { x: 12, y: 5 },
-      })
-      .setOrigin(0.5)
-      .setDepth(60)
-      .setScrollFactor(0);
-
-    this.applySiteLook();
-    this.refreshJobs();
-  }
-
-  private lit(): boolean {
+    let night = false;
     try {
       const s = bridge().getState();
-      return isDaylight(s.site, s.day);
-    } catch {
-      return true;
-    }
-  }
-
-  private applySiteLook() {
-    try {
-      const s = bridge().getState();
-      const lit = isDaylight(s.site, s.day);
-      if (s.site === "rim") {
-        this.siteBanner.setText("☀ Rim site — sunny almost every day · steadier power");
-        this.sunGlow.setAlpha(0.55).setVisible(true);
-        this.nightOverlay.setAlpha(0);
-        this.cameras.main.setBackgroundColor(0x2a2218);
-      } else if (lit) {
-        this.siteBanner.setText("☀ Plain site — daylight now · later days get dark");
-        this.sunGlow.setAlpha(0.35).setVisible(true);
-        this.nightOverlay.setAlpha(0.15);
-      } else {
-        this.siteBanner.setText("☾ Plain site — night · little solar power · save chips");
-        this.sunGlow.setVisible(false);
-        this.nightOverlay.setAlpha(0.55);
-        this.cameras.main.setBackgroundColor(0x0a1020);
-      }
+      night = !isDaylight(s.site, s.day);
     } catch {
       /* */
     }
+
+    paintMoonGround(this, W, H, night);
+
+    // Soft photo wash for texture (not the whole UI)
+    this.add
+      .image(W / 2, H * 0.55, "surface")
+      .setDisplaySize(W * 0.92, H * 0.55)
+      .setAlpha(0.28)
+      .setDepth(1);
+
+    if (!night) {
+      this.add.ellipse(W * 0.85, H * 0.1, 90, 90, 0xffe08a, 0.55).setDepth(2);
+    } else {
+      for (let i = 0; i < 20; i++) {
+        this.add
+          .circle(Math.random() * W, Math.random() * H * 0.35, 1.2, 0xffffff, 0.8)
+          .setDepth(2);
+      }
+    }
+    this.add.image(W * 0.1, H * 0.12, "earth").setDisplaySize(72, 72).setDepth(3);
+
+    this.zones = [];
+    this.placeBuilding("home", "Crew home", W * 0.2, H * 0.48, "habitat", 130, 110);
+    this.placeBuilding("greenhouse", "Greenhouse", W * 0.5, H * 0.42, "greenhouse", 120, 110);
+    this.placeBuilding("lab", "Science lab", W * 0.78, H * 0.48, "labCottage", 120, 110);
+
+    this.placeProp(W * 0.35, H * 0.7, "panels", 100, 60, "Solar panels");
+    this.placeProp(W * 0.62, H * 0.68, "dish", 70, 70, "Earth dish");
+    this.placeProp(W * 0.88, H * 0.72, "rover", 90, 58, "Rover");
+
+    this.makeDayBoard(W * 0.5, H * 0.82);
+    this.spawnWorkingCrew(W, H);
+
+    this.player = this.physics.add
+      .sprite(W * 0.5, H * 0.72, "nova")
+      .setDisplaySize(58, 78)
+      .setCollideWorldBounds(true)
+      .setDepth(20);
+    this.player.body!.setSize(28, 22);
+    this.player.body!.setOffset(18, 55);
+    this.physics.world.setBounds(24, H * 0.36, W - 48, H * 0.52);
+
+    const sh = addShadow(this, this.player);
+    this.shadowSync = sh.sync;
+    idleBreathe(this, this.player);
+    this.walkSync = walkHop(this.player).sync;
+
+    this.keys = makeKeys(this);
+    this.buildPad();
+
+    this.hud = this.add
+      .text(12, 10, "", {
+        fontFamily: THEME.font,
+        fontSize: "13px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 10, y: 8 },
+      })
+      .setDepth(70)
+      .setScrollFactor(0);
+
+    this.prompt = this.add
+      .text(W / 2, H - 18, "", {
+        fontFamily: THEME.font,
+        fontSize: "13px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(0.5)
+      .setDepth(70)
+      .setScrollFactor(0);
+
+    const plan = this.add
+      .text(W - 12, 14, "Plan day", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "15px",
+        color: THEME.ink,
+        backgroundColor: "#d9f5e5",
+        padding: { x: 12, y: 7 },
+      })
+      .setOrigin(1, 0)
+      .setDepth(70)
+      .setInteractive({ useHandCursor: true });
+    plan.on("pointerdown", () => this.tradeModal.show());
+
+    this.nasaFrame = new NasaFrame(this, W - 100, H * 0.38);
+    this.tradeModal = new TradeOffModal(this);
+    this.choiceModal = new ChoiceModal(this);
+
+    // Start with trade-off open (teaching first)
+    this.time.delayedCall(200, () => {
+      try {
+        const mode = bridge().getMode();
+        if (mode === "power" || mode === "explore") this.tradeModal.show();
+        if (mode === "choose") this.choiceModal.show();
+      } catch {
+        /* */
+      }
+    });
   }
 
-  private spawnCrew(W: number, H: number) {
-    this.crew = [];
-    const a = this.add.image(W * 0.38, H * 0.58, "girl").setDisplaySize(52, 68).setDepth(9);
-    const b = this.add.image(W * 0.58, H * 0.6, "worker").setDisplaySize(52, 68).setDepth(9);
-    this.crew.push(a, b);
-
-    // Working motions toward panels / dish
-    this.tweens.add({
-      targets: a,
-      x: W * 0.36,
-      y: H * 0.66,
-      duration: 2200,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.inOut",
-    });
-    this.tweens.add({
-      targets: b,
-      x: W * 0.64,
-      angle: 6,
-      duration: 1600,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.inOut",
-    });
-
-    // Sparks while working
-    this.time.addEvent({
-      delay: 700,
-      loop: true,
-      callback: () => {
-        const spark = this.add
-          .circle(a.x + 10, a.y - 20, 3, 0xfff1a8, 0.9)
-          .setDepth(11);
-        this.tweens.add({
-          targets: spark,
-          y: spark.y - 18,
-          alpha: 0,
-          duration: 400,
-          onComplete: () => spark.destroy(),
-        });
-      },
-    });
-  }
-
-  private makeDoor(
+  private placeBuilding(
     room: "home" | "greenhouse" | "lab",
     label: string,
     x: number,
@@ -238,123 +167,139 @@ export class BaseWorldScene extends Phaser.Scene {
     w: number,
     h: number,
   ) {
-    const sprite = this.add.image(x, y, key).setDisplaySize(w, h).setDepth(6);
-    const tag = this.add
-      .text(x, y - h * 0.55, label, {
-        fontFamily: "Georgia, serif",
-        fontSize: "12px",
-        color: "#1c2a3a",
-        backgroundColor: "#ffe8b8",
-        padding: { x: 6, y: 3 },
-        align: "center",
-      })
-      .setOrigin(0.5)
-      .setDepth(20);
+    const img = this.add.image(x, y, key).setDisplaySize(w, h).setDepth(8);
     this.tweens.add({
-      targets: tag,
-      y: tag.y - 5,
-      duration: 900,
+      targets: img,
+      y: y - 4,
+      duration: 1400,
       yoyo: true,
       repeat: -1,
+      ease: "Sine.inOut",
     });
-
+    const tag = this.add
+      .text(x, y - h * 0.55, label, {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "12px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5)
+      .setDepth(25);
     const hit = this.add
-      .rectangle(x, y, w * 0.85, h * 0.85, 0xffffff, 0.001)
+      .rectangle(x, y, w * 0.9, h * 0.9, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true })
-      .setDepth(7);
-    hit.on("pointerover", () => sprite.setTint(0xfff0c0));
-    hit.on("pointerout", () => sprite.clearTint());
+      .setDepth(9);
+    hit.on("pointerover", () => img.setTint(0xffe7a8));
+    hit.on("pointerout", () => img.clearTint());
     hit.on("pointerdown", () => {
+      if (this.tradeModal.isOpen() || this.choiceModal.isOpen()) return;
+      sparkBurst(this, x, y - 20);
       this.scene.start("indoor", { room });
     });
-
-    this.zones.push({
-      id: room,
-      kind: "door",
-      label: label.replace("\n", " "),
-      room,
-      x,
-      y,
-      w: w * 0.7,
-      h: h * 0.7,
-      hit,
-    });
+    this.zones.push({ id: room, kind: "door", label, room, x, y, r: 70 });
+    void tag;
   }
 
-  private makeProp(
-    id: string,
-    label: string,
+  private placeProp(
     x: number,
     y: number,
     key: string,
     w: number,
     h: number,
-    onUse: () => void,
+    label: string,
   ) {
-    const sprite = this.add.image(x, y, key).setDisplaySize(w, h).setDepth(6);
+    const img = this.add.image(x, y, key).setDisplaySize(w, h).setDepth(7);
     this.tweens.add({
-      targets: sprite,
-      y: y - 4,
-      duration: 1100 + Math.random() * 400,
+      targets: img,
+      angle: 3,
+      duration: 1200,
       yoyo: true,
       repeat: -1,
-      ease: "Sine.inOut",
     });
-    const hit = this.add
-      .rectangle(x, y, w, h, 0xffffff, 0.001)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(7);
-    hit.on("pointerdown", onUse);
-    this.zones.push({ id, kind: "prop", label, x, y, w, h, onUse, hit });
+    this.zones.push({
+      id: key,
+      kind: "prop",
+      label,
+      x,
+      y,
+      r: 55,
+      onUse: () => {
+        sparkBurst(this, x, y);
+        this.prompt.setText(label);
+      },
+    });
   }
 
-  private makeBoard(x: number, y: number) {
+  private makeDayBoard(x: number, y: number) {
     const board = this.add
-      .rectangle(x, y, 180, 52, 0xf0c14a)
-      .setStrokeStyle(3, 0x1c2a3a)
-      .setDepth(8)
+      .rectangle(x, y, 170, 46, THEME.accent)
+      .setStrokeStyle(3, THEME.line, 0.25)
+      .setDepth(10)
       .setInteractive({ useHandCursor: true });
     this.add
-      .text(x, y, "DAY BOARD\n(finish jobs)", {
-        fontFamily: "Georgia, serif",
-        fontSize: "13px",
-        color: "#1c2a3a",
+      .text(x, y, "DAY BOARD", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "14px",
+        color: THEME.ink,
         fontStyle: "bold",
-        align: "center",
       })
       .setOrigin(0.5)
-      .setDepth(9);
+      .setDepth(11);
     this.tweens.add({
       targets: board,
-      scale: 1.04,
-      duration: 700,
+      scale: 1.05,
+      duration: 650,
       yoyo: true,
       repeat: -1,
     });
     board.on("pointerdown", () => this.useBoard());
-    this.zones.push({
-      id: "board",
-      kind: "board",
-      label: "Day board",
-      x,
-      y,
-      w: 180,
-      h: 56,
-      hit: board,
+    this.zones.push({ id: "board", kind: "board", label: "Day board", x, y, r: 70 });
+  }
+
+  private spawnWorkingCrew(W: number, H: number) {
+    const a = this.add.image(W * 0.4, H * 0.6, "girl").setDisplaySize(48, 64).setDepth(12);
+    const b = this.add.image(W * 0.6, H * 0.62, "worker").setDisplaySize(48, 64).setDepth(12);
+    idleBreathe(this, a);
+    idleBreathe(this, b);
+    this.tweens.add({
+      targets: a,
+      x: W * 0.37,
+      y: H * 0.66,
+      duration: 2400,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+    this.tweens.add({
+      targets: b,
+      x: W * 0.64,
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+    });
+    this.time.addEvent({
+      delay: 650,
+      loop: true,
+      callback: () => sparkBurst(this, a.x + 8, a.y - 18, 0xffe08a),
     });
   }
 
-  private buildTouchPad() {
+  private buildPad() {
     const { width: W, height: H } = this.scale;
     const mk = (x: number, y: number, label: string, dx: number, dy: number) => {
       const b = this.add
-        .rectangle(x, y, 44, 44, 0x1c2a3a, 0.55)
-        .setStrokeStyle(2, 0xfff8ef)
+        .rectangle(x, y, 42, 42, THEME.panel, 0.92)
+        .setStrokeStyle(2, THEME.line, 0.2)
         .setScrollFactor(0)
         .setDepth(70)
         .setInteractive({ useHandCursor: true });
       this.add
-        .text(x, y, label, { fontSize: "16px", color: "#fff8ef" })
+        .text(x, y, label, {
+          fontFamily: THEME.fontDisplay,
+          fontSize: "16px",
+          color: THEME.ink,
+        })
         .setOrigin(0.5)
         .setScrollFactor(0)
         .setDepth(71);
@@ -369,23 +314,24 @@ export class BaseWorldScene extends Phaser.Scene {
       b.on("pointerup", clear);
       b.on("pointerout", clear);
     };
-    const ox = 64;
-    const oy = H - 86;
-    mk(ox, oy - 46, "↑", 0, -1);
-    mk(ox - 46, oy, "←", -1, 0);
+    const ox = 60;
+    const oy = H - 78;
+    mk(ox, oy - 44, "↑", 0, -1);
+    mk(ox - 44, oy, "←", -1, 0);
     mk(ox, oy, "↓", 0, 1);
-    mk(ox + 46, oy, "→", 1, 0);
+    mk(ox + 44, oy, "→", 1, 0);
 
     const act = this.add
-      .circle(W - 64, H - 86, 34, 0x0b6b4f, 0.8)
-      .setStrokeStyle(3, 0xfff8ef)
+      .circle(W - 58, H - 78, 30, THEME.good, 0.95)
+      .setStrokeStyle(3, THEME.line, 0.25)
       .setScrollFactor(0)
       .setDepth(70)
       .setInteractive({ useHandCursor: true });
     this.add
-      .text(W - 64, H - 86, "DO", {
-        fontSize: "15px",
-        color: "#fff8ef",
+      .text(W - 58, H - 78, "DO", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "14px",
+        color: THEME.ink,
         fontStyle: "bold",
       })
       .setOrigin(0.5)
@@ -394,19 +340,17 @@ export class BaseWorldScene extends Phaser.Scene {
     act.on("pointerdown", () => this.tryInteract());
   }
 
-  private say(msg: string) {
-    this.novaBubble.setText(msg);
-  }
-
-  private refreshJobs() {
+  private refreshHud() {
     try {
       const b = bridge();
       const d = b.getDecisions();
-      const rows = jobRows(d);
-      const bits = rows.map((j) => `${j.on ? "☑" : "☐"} ${shortLabel(j.id)}`).join(" · ");
       const spent = plannedPowerCost(d);
-      this.jobsBar.setText(
-        `TODAY'S JOBS · Day ${b.getDay()}/10 · power ${spent}/${b.getPowerToday()} · ${bits}`,
+      const s = b.getState();
+      const lit = isDaylight(s.site, s.day);
+      this.hud.setText(
+        `Day ${b.getDay()}/10  ${lit ? "☀" : "☾"} ${s.site}\n` +
+          `Power ${spent}/${b.getPowerToday()}  💧${s.water}  O₂${s.oxygen}  ⚠${s.exposure}\n` +
+          `Cleaner ${d.recycler ? "ON" : "off"} · Air ${d.oxygenMaker ? "ON" : "off"} · Plants ${d.greenhouse ? "ON" : "off"} · Walks ${d.scienceLevel}`,
       );
     } catch {
       /* */
@@ -415,39 +359,62 @@ export class BaseWorldScene extends Phaser.Scene {
 
   update() {
     if (!this.player?.body) return;
-    applyMovement(this.player, this.keys, this.pad);
-    this.applySiteLook();
-    this.refreshJobs();
 
-    // Night: crew works slower / dimmer
-    const lit = this.lit();
-    for (const c of this.crew) c.setAlpha(lit ? 1 : 0.65);
+    // React to mode changes from the shell
+    try {
+      const mode = bridge().getMode();
+      if (mode !== this.lastMode) {
+        this.lastMode = mode;
+        if (mode === "choose") {
+          this.tradeModal.hide();
+          this.choiceModal.show();
+        } else if (mode === "power") {
+          this.choiceModal.hide();
+          this.tradeModal.show();
+        }
+      }
+    } catch {
+      /* */
+    }
+
+    if (this.tradeModal.isOpen() || this.choiceModal.isOpen()) {
+      this.player.setVelocity(0, 0);
+      this.refreshHud();
+      this.prompt.setText("Finish the card · or Walk the base");
+      return;
+    }
+
+    applyMovement(this.player, this.keys, this.pad);
+    this.shadowSync?.();
+    this.walkSync?.();
+    this.refreshHud();
+    this.nasaFrame?.refresh();
 
     this.near = null;
-    let best = 9999;
+    let best = 999;
     for (const z of this.zones) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x, z.y);
-      if (dist < Math.max(z.w, z.h) * 0.7 && dist < best) {
+      if (dist < z.r && dist < best) {
         best = dist;
         this.near = z;
       }
     }
-
     this.prompt.setText(
       this.near
-        ? `Click or SPACE — ${this.near.label}`
-        : "Click doors / Day board · or walk with arrows + SPACE",
+        ? `Click / SPACE — ${this.near.label}`
+        : "Click a building · Plan day · arrows to walk",
     );
-
     if (actionJustPressed(this.keys)) this.tryInteract();
   }
 
   private tryInteract() {
+    if (this.tradeModal.isOpen() || this.choiceModal.isOpen()) return;
     if (!this.near) {
-      this.say("Click a glowing door, or walk closer and press SPACE / DO.");
+      this.tradeModal.show();
       return;
     }
     if (this.near.kind === "door" && this.near.room) {
+      sparkBurst(this, this.near.x, this.near.y);
       this.scene.start("indoor", { room: this.near.room });
       return;
     }
@@ -462,30 +429,13 @@ export class BaseWorldScene extends Phaser.Scene {
     const b = bridge();
     const spent = plannedPowerCost(b.getDecisions());
     if (spent > b.getPowerToday()) {
-      this.say("Too much power! Go turn something OFF in a room.");
+      this.tradeModal.show();
       return;
     }
-    const mode = b.getMode();
-    if (mode === "explore") {
-      b.goPowerCheck();
-      this.say("Power checked! Click Day board again when ready for today's choice.");
+    if (b.getMode() === "choose") {
+      this.choiceModal.show();
       return;
     }
-    if (mode === "power") {
-      b.goChoice();
-      this.say("Choice time — pick A or B on the side. They are different trade-offs!");
-      return;
-    }
-    this.say("Finish today's choice on the side panel.");
+    this.tradeModal.show();
   }
-}
-
-function shortLabel(id: string): string {
-  if (id === "heat") return "Heat";
-  if (id === "recycler") return "Cleaner";
-  if (id === "air") return "Air";
-  if (id === "comms") return "Radio";
-  if (id === "gh") return "Plants";
-  if (id === "sci") return "Walks";
-  return id;
 }

@@ -4,6 +4,8 @@ import type { ResourceDelta } from "./useGameSession";
 import { plainTalk } from "../content/banned";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
+import { nasaImageForPlay } from "../content/imageForContext";
+import { CardNasaImage } from "./CardNasaImage";
 import { ReadAloudButton } from "./teach/ReadAloudButton";
 import { SpaceText } from "./teach/SpaceText";
 
@@ -35,6 +37,15 @@ export function DayResultView({
   const summary = `${trade} ${deltas
     .map((d) => `${d.label} ${d.before} to ${d.after}`)
     .join(". ")}`;
+  const nasa = nasaImageForPlay(result.dayLog.day, event?.id);
+  const photo = event?.image ?? {
+    slot: nasa.slot,
+    nasaId: nasa.id,
+    src: nasa.file,
+    alt: nasa.alt,
+    credit: nasa.credit,
+    pageUrl: nasa.pageUrl,
+  };
 
   return (
     <section className="panel day-result">
@@ -45,6 +56,8 @@ export function DayResultView({
           <p>This is the trade-off. Nothing was free.</p>
         </div>
       </header>
+
+      <CardNasaImage image={photo} className="day-result__nasa" />
 
       <div className="teach-block trade-result">
         <h3>Your trade-off today</h3>

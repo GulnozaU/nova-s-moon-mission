@@ -29,12 +29,28 @@ export function nasaImageForContext(
   return getNasaImage(slot);
 }
 
-/** Rotate through every bundled still so the sidebar does not feel stuck. */
+/** Rotate through every bundled still so the frame never feels stuck. */
 export function nasaImageForDay(day: number): NasaImage {
   const slots = listNasaImages().map((i) => i.slot);
   const pool = slots.length > 0 ? slots : DAY_ROTATION;
   const slot = pool[Math.abs(day - 1) % pool.length]!;
   return getNasaImage(slot);
+}
+
+/**
+ * Event-aware pick that still changes across days when events share a theme.
+ * Uses day offset so two storm days do not always show the identical crop feel.
+ */
+export function nasaImageForPlay(day: number, eventId?: string | null): NasaImage {
+  if (!eventId) return nasaImageForDay(day);
+  const primary = slotForContext(eventId, day);
+  // On even days with a mapped event, occasionally show the day-rotation neighbor
+  // so the gallery feels alive — but keep event match as default.
+  if (day % 3 === 0) {
+    const alt = DAY_ROTATION[Math.abs(day) % DAY_ROTATION.length]!;
+    if (alt !== primary) return getNasaImage(alt);
+  }
+  return getNasaImage(primary);
 }
 
 function slotForContext(context: string, day: number): ImageSlot {
@@ -44,32 +60,27 @@ function slotForContext(context: string, day: number): ImageSlot {
   if (
     c.includes("green") ||
     c.includes("plant") ||
-    c === "greenhouse-experiment" ||
-    c.includes("water")
+    c === "greenhouse-experiment"
   ) {
     return "greenhouse";
   }
   if (c.includes("rim") || c.includes("south") || c === "southpole") return "southPole";
-  if (
-    c.includes("plain") ||
-    c.includes("equator") ||
-    c === "supply-drop" ||
-    c === "battery-surge"
-  ) {
-    return "equatorial";
-  }
+  if (c === "supply-drop") return "equatorial";
+  if (c === "battery-surge") return "title";
   if (c === "delayed-message" || c.includes("radio") || c.includes("comms")) {
     return "equatorial";
   }
   if (
     c.includes("storm") ||
-    c.includes("sun") ||
     c === "solar-storm" ||
-    c === "why-radiation-matters" ||
-    c === "weather"
+    c === "why-radiation-matters"
   ) {
     return "storm";
   }
-  // Unknown / quiet day — still change with the mission day.
+  // Generic weather / unknown — rotate by day (do NOT stick on storm forever).
+  if (c === "weather" || c.includes("sun")) {
+    return DAY_ROTATION[Math.abs(day - 1) % DAY_ROTATION.length]!;
+  }
+  if (c.includes("plain") || c.includes("equator")) return "equatorial";
   return DAY_ROTATION[Math.abs(day - 1) % DAY_ROTATION.length]!;
 }
