@@ -9,9 +9,11 @@ import { CardNasaImage } from "../ui/CardNasaImage";
 import { SourceBadge } from "../ui/SourceBadge";
 import { DecisionTeachCard } from "../ui/teach/DecisionTeachCard";
 import { SpaceText } from "../ui/teach/SpaceText";
+import { isDaylight, sunBarLabel } from "../ui/teach/dayNight";
 import { plannedPowerCost } from "../ui/powerMath";
 import { moonBridgeRef, type PlayMode } from "./bridge";
 import { createMoonGame } from "./createMoonGame";
+import { jobRows } from "./jobsHud";
 import "./phaser-play.css";
 
 type Props = {
@@ -79,8 +81,8 @@ export function PhaserPlay({
       getEvent: () => latest.current.event,
       getHint: () =>
         latest.current.mode === "choose"
-          ? "Pick today's choice on the side."
-          : "Walk into rooms. Grab tools. Press SPACE.",
+          ? "Pick A or B — they help and cost different things."
+          : "Click glowing tools and machines. Jobs stay on top.",
       patchDecisions: (patch) =>
         latest.current.onDecisions({ ...latest.current.decisions, ...patch }),
       setDecisions: (d) => latest.current.onDecisions(d),
@@ -114,76 +116,105 @@ export function PhaserPlay({
 
   const spent = plannedPowerCost(decisions);
   const left = powerToday - spent;
+  const jobs = jobRows(decisions);
+  const dayLit = isDaylight(state.site, state.day);
 
   return (
-    <section className="phaser-play">
-      <div className="phaser-play__stage" ref={hostRef} />
+    <section className={`phaser-play ${dayLit ? "is-day" : "is-night"}`}>
+      <div className="phaser-todo" aria-label="Today's jobs">
+        <strong>Today&apos;s jobs</strong>
+        <ul>
+          {jobs.map((j) => (
+            <li key={j.id} className={j.on ? "is-on" : ""}>
+              <span aria-hidden="true">{j.on ? "☑" : "☐"}</span>
+              <span>
+                {j.label}
+                <em> · {j.where}</em>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="phaser-todo__power">
+          Power {spent}/{powerToday}
+          {left < 0 ? " · too much!" : ` · left ${left}`} · {sunBarLabel(state.site)}
+        </p>
+      </div>
 
-      <aside className="phaser-play__side">
-        <div className="phaser-side-card">
-          <h3>How to play</h3>
-          <ol>
-            <li>Move with arrows / WASD or the on-screen pad</li>
-            <li>Walk to a glowing door → SPACE / E / DO</li>
-            <li>Grab a tool, then use it on a machine or plants</li>
-            <li>Walk to the yellow Day board when jobs are done</li>
-          </ol>
-        </div>
+      <div className="phaser-play__body">
+        <div className="phaser-play__stage" ref={hostRef} />
 
-        <div className="phaser-side-card">
-          <h3>Supplies</h3>
-          <p>
-            Power plan {spent}/{powerToday} · left {Math.max(0, left)}{" "}
-            <SourceBadge badge="ASSUMPTION" />
-          </p>
-          <p>
-            Water {state.water} · O₂ {state.oxygen} · Risk {state.exposure}/
-            {LOSE_EXPOSURE_AT}
-          </p>
-          {left < 0 ? (
-            <p className="warn">Too much power — turn something off in a room.</p>
-          ) : null}
-        </div>
-
-        <div className="phaser-side-card">
-          <h3>NASA picture</h3>
-          <CardNasaImage image={photo} className="phaser-side-card__photo" />
-          <p>
-            <SpaceText
-              text={plainTalk(
-                event?.explanation ??
-                  "Walk the base like a real adventure — then finish the day board.",
-              )}
-              onOpenDrawer={onOpenGlossary}
-            />
-          </p>
-        </div>
-
-        {mode === "choose" && event ? (
-          <div className="phaser-side-card phaser-side-card--choice">
-            <DecisionTeachCard
-              event={event}
-              day={state.day}
-              onConfirm={onChoose}
-              onBack={onPlanPower}
-              onOpenGlossary={onOpenGlossary}
-            />
-          </div>
-        ) : (
+        <aside className="phaser-play__side">
           <div className="phaser-side-card">
-            <h3>Weather</h3>
+            <h3>How to play</h3>
+            <ol>
+              <li>
+                <strong>Click</strong> glowing tools and machines (mouse/cursor)
+              </li>
+              <li>
+                Grab shows next to your pointer (wrench / can / notebook)
+              </li>
+              <li>Watch plants: green = watered, brown = dry</li>
+              <li>Click yellow Day board when jobs look right</li>
+            </ol>
+          </div>
+
+          <div className="phaser-side-card">
+            <h3>Supplies</h3>
+            <p>
+              Water {state.water} · O₂ {state.oxygen} · Risk {state.exposure}/
+              {LOSE_EXPOSURE_AT} <SourceBadge badge="ASSUMPTION" />
+            </p>
+            <p>
+              Site: {state.site === "rim" ? "sunny rim" : "darker plain"} ·{" "}
+              {dayLit ? "Daylight" : "Night"}
+            </p>
+            {left < 0 ? (
+              <p className="warn">Too much power — turn something off.</p>
+            ) : null}
+          </div>
+
+          <div className="phaser-side-card">
+            <h3>NASA picture</h3>
+            <CardNasaImage image={photo} className="phaser-side-card__photo" />
             <p>
               <SpaceText
                 text={plainTalk(
-                  `Sun activity is ${weather.strongestFlare?.classType ?? "quiet"}. NASA watches so crews can get ready.`,
+                  event?.explanation ??
+                    (dayLit
+                      ? "Sunny now — good time for careful outdoor work."
+                      : "Night on this site — solar panels make less power."),
                 )}
                 onOpenDrawer={onOpenGlossary}
               />
             </p>
-            <SourceBadge badge={weather.source} />
           </div>
-        )}
-      </aside>
+
+          {mode === "choose" && event ? (
+            <div className="phaser-side-card phaser-side-card--choice">
+              <DecisionTeachCard
+                event={event}
+                day={state.day}
+                onConfirm={onChoose}
+                onBack={onPlanPower}
+                onOpenGlossary={onOpenGlossary}
+              />
+            </div>
+          ) : (
+            <div className="phaser-side-card">
+              <h3>Weather</h3>
+              <p>
+                <SpaceText
+                  text={plainTalk(
+                    `Sun activity is ${weather.strongestFlare?.classType ?? "quiet"}. NASA watches so crews can get ready.`,
+                  )}
+                  onOpenDrawer={onOpenGlossary}
+                />
+              </p>
+              <SourceBadge badge={weather.source} />
+            </div>
+          )}
+        </aside>
+      </div>
     </section>
   );
 }
