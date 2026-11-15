@@ -2,6 +2,17 @@ Nova's Moon Mission: Spec and Cursor
 Prompts
 NASA Space Apps 2026, Build a Junior Astronaut Mission Trainer. Hand this whole doc to
 Cursor, then feed it the prompts in Section 9 one at a time.
+
+## Built as of Stage 1–4 finish (wins over older lines below)
+
+- **Shelter factor** ≈ **0.3** (sheltering cuts storm exposure by ≥50% vs staying out). Tunables in `src/engine/constants.ts`, tagged ASSUMPTION.
+- **Two storms** per mission on days **4|5** and **8|9** (seeded), each from a real DONKI record (ID + date). Comms ON shows “storm coming in N days” when `stormDay - day ≤ warningDays` from CME speed; Comms OFF uses `floor(warningDays/2)`.
+- **No Quiet Continue/Continue** filler. Every day is a real two-option trade-off; many costs land 2+ days later. Clogged filter → **Clean the filter** (1 material + 1 power).
+- **One play mode** (no difficulty picker). On-screen ASSUMPTION badge label is **“Game rule”** (legend still says ASSUMPTION).
+- **One Phaser instance** from Day 1→end; React only for welcome, training, site, end report, legend. No scrolling DayResult page — in-world consequence card.
+- **No API keys in the client.** LIVE→ARCHIVED fallback for DONKI and OSDR with visible badges. No NASA logo.
+- Demo seed: `?demo=1` → seed `20261115`. See `REFERENCES.md`.
+
 0. Read this first
 Deadline: the submission page says projects close Sunday, November 15 at 11:59 p.m.
 local time. If that is tonight, build only the lines marked [TONIGHT] and cut
@@ -97,13 +108,14 @@ Build a shield level: 2 materials. Each level cuts storm exposure by 20 percent 
 levels, 80 percent).
 Build a solar panel: 3 materials, +1 power chip per day, permanent.
 Materials start at 10. A small resupply event can add some (see events).
-3.7 Storm exposure formula
-base  = severity * 15                      // severity 1, 2 or 3 from real 
-flare class
-if sheltered:   exposure += base * 0.15 * (1 - 0.2 * shieldLevel)
-else:           exposure += base * (1 - 0.2 * shieldLevel)
+3.7 Storm exposure formula (as built)
+base  = severity * STORM_EXPOSURE_PER_SEVERITY   // currently 16; ASSUMPTION
+if sheltered:   exposure += base * 0.3 * (1 - 0.15 * shieldLevel)
+else:           exposure += base * (1 - 0.15 * shieldLevel)
 if sheltered:   science that day = 0       // the cost of staying safe
-Normal days outside add a small exposure of 2 (assumption).
+Normal days outside add a small exposure (ASSUMPTION). Unshielded habitat adds a
+small daily creep until the first shield is built (ASSUMPTION). Lose when exposure
+reaches loseExposureAt (currently 55), or water/oxygen ≤ 0.
 3.8 Sites (two only)
 The equatorial sunlight fraction (about half) is solid.
 The polar illumination fraction must be verified against a NASA/LRO source before

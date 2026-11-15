@@ -82,7 +82,14 @@ export type GameSession = {
   missionDays: number;
 };
 
+/** Fixed seed for ?demo=1 so a 30s video is reproducible. ASSUMPTION. */
+export const DEMO_SEED = 20261115;
+
 function newSeed(): number {
+  if (typeof window !== "undefined") {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("demo") === "1") return DEMO_SEED;
+  }
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
@@ -370,7 +377,11 @@ export function useGameSession(): GameSession {
   }, [lastResult, schedule]);
 
   const replay = useCallback(() => {
-    const s = newSeed();
+    const s =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("demo") === "1"
+        ? DEMO_SEED
+        : newSeed();
     setSeed(s);
     setSite(null);
     setState(null);

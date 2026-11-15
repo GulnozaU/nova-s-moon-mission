@@ -66,22 +66,25 @@ export function PhaserPlay({
     onContinueAfterResult,
     onOpenGlossary,
   });
-  latest.current = {
-    state,
-    decisions,
-    powerToday,
-    mode,
-    event,
-    deltas,
-    stormAlerts,
-    tomorrowHint,
-    onDecisions,
-    onPlanPower,
-    onReadyForEvent,
-    onChoose,
-    onContinueAfterResult,
-    onOpenGlossary,
-  };
+
+  useEffect(() => {
+    latest.current = {
+      state,
+      decisions,
+      powerToday,
+      mode,
+      event,
+      deltas,
+      stormAlerts,
+      tomorrowHint,
+      onDecisions,
+      onPlanPower,
+      onReadyForEvent,
+      onChoose,
+      onContinueAfterResult,
+      onOpenGlossary,
+    };
+  });
 
   useEffect(() => {
     const wire = () => {

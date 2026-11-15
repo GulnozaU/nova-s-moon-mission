@@ -25,6 +25,31 @@
   --font-display: "Baloo 2", "Nunito", sans-serif;
   --font-body: "Nunito", sans-serif;
   --radius: 20px;
+  --btn-min: 48px;
+}
+
+/* Storybook pastel sheet — shared with Phaser THEME */
+.nova-app .btn {
+  min-height: var(--btn-min);
+  min-width: var(--btn-min);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.nova-app .btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.nova-app .btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nova-app *,
+  .nova-app *::before,
+  .nova-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .nova-app {

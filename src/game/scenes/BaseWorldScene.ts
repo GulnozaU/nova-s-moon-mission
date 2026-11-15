@@ -47,6 +47,8 @@ export class BaseWorldScene extends Phaser.Scene {
   private lastMode = "";
   private lastDay = -1;
   private alertText!: Phaser.GameObjects.Text;
+  private dishImg: Phaser.GameObjects.Image | null = null;
+  private dishSpin: Phaser.Tweens.Tween | null = null;
 
   constructor() {
     super("base");
@@ -104,7 +106,7 @@ export class BaseWorldScene extends Phaser.Scene {
     this.placeBuilding("lab", "Science lab", W * 0.78, H * 0.48, "labCottage", 120, 110);
 
     this.placeProp(W * 0.35, H * 0.7, "panels", 100, 60, "Solar panels");
-    this.placeProp(W * 0.62, H * 0.68, "dish", 70, 70, "Earth dish");
+    this.dishImg = this.placeProp(W * 0.62, H * 0.68, "dish", 70, 70, "Earth dish");
     this.placeProp(W * 0.88, H * 0.72, "rover", 90, 58, "Rover");
 
     this.makeDayBoard(W * 0.5, H * 0.82);
@@ -243,15 +245,17 @@ export class BaseWorldScene extends Phaser.Scene {
     w: number,
     h: number,
     label: string,
-  ) {
+  ): Phaser.GameObjects.Image {
     const img = this.add.image(x, y, key).setDisplaySize(w, h).setDepth(7);
-    this.tweens.add({
-      targets: img,
-      angle: 3,
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-    });
+    if (key !== "dish") {
+      this.tweens.add({
+        targets: img,
+        angle: 3,
+        duration: 1200,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
     this.zones.push({
       id: key,
       kind: "prop",
@@ -264,6 +268,24 @@ export class BaseWorldScene extends Phaser.Scene {
         this.prompt.setText(label);
       },
     });
+    return img;
+  }
+
+  private syncDishSpin() {
+    if (!this.dishImg) return;
+    const on = bridge().ready() && bridge().getDecisions().comms;
+    if (on && !this.dishSpin) {
+      this.dishSpin = this.tweens.add({
+        targets: this.dishImg,
+        angle: 360,
+        duration: 4000,
+        repeat: -1,
+      });
+    } else if (!on && this.dishSpin) {
+      this.dishSpin.stop();
+      this.dishSpin = null;
+      this.dishImg.setAngle(0);
+    }
   }
 
   private makeDayBoard(x: number, y: number) {
@@ -459,6 +481,7 @@ export class BaseWorldScene extends Phaser.Scene {
     this.walkSync?.();
     this.refreshHud();
     this.nasaFrame?.refresh();
+    this.syncDishSpin();
 
     this.near = null;
     let best = 999;

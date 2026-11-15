@@ -1,5 +1,13 @@
 import Phaser from "phaser";
 
+function reduceMotion(): boolean {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
 /** Soft ground shadow under a 2D character. */
 export function addShadow(
   scene: Phaser.Scene,
@@ -17,11 +25,12 @@ export function addShadow(
   return { shadow, sync };
 }
 
-/** Idle breathe forever. */
+/** Idle breathe forever (skipped when prefers-reduced-motion). */
 export function idleBreathe(
   scene: Phaser.Scene,
   sprite: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite,
 ) {
+  if (reduceMotion()) return null;
   const sy = sprite.scaleY;
   return scene.tweens.add({
     targets: sprite,
@@ -55,6 +64,7 @@ export function walkHop(
 
 /** Cute spark burst for interactions. */
 export function sparkBurst(scene: Phaser.Scene, x: number, y: number, color = 0xfff1a8) {
+  if (reduceMotion()) return;
   for (let i = 0; i < 6; i++) {
     const p = scene.add.circle(x, y, 3 + Math.random() * 2, color, 0.95).setDepth(50);
     scene.tweens.add({

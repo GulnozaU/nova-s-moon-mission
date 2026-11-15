@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { bridge } from "../bridge";
 import { nasaImageForContext, nasaImageForDay } from "../../content/imageForContext";
+import { nasaKidCaption } from "../../content/nasaCaption";
 import { THEME } from "../theme";
 
 /**
@@ -56,7 +57,9 @@ export class NasaFrame {
         this.lastKey = key;
         this.photo.setTexture(key).setDisplaySize(148, 100);
       }
-      this.caption.setText(`${img.title.slice(0, 42)}${img.title.length > 42 ? "…" : ""}`);
+      this.caption.setText(
+        nasaKidCaption(img, { eventDate: event?.eventDate }),
+      );
     } catch {
       /* bridge */
     }
