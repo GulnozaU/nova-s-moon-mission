@@ -270,8 +270,43 @@ button.actor {
 .actor--panels { width: 140px; right: 24%; bottom: 30%; pointer-events: none; }
 .actor--dish { width: 84px; right: 16%; bottom: 36%; transform-origin: 50% 80%; pointer-events: none; }
 .actor--rover { width: 190px; right: 5%; bottom: 11%; pointer-events: none; }
-.actor--nova { width: 100px; left: 7%; bottom: 9%; pointer-events: none; }
-.actor--girl { width: 84px; left: 15%; bottom: 10%; pointer-events: none; }
+.actor--nova { width: 110px; left: 8%; bottom: 8%; pointer-events: none; }
+.actor--girl { width: 96px; left: 18%; bottom: 10%; pointer-events: none; }
+.actor--worker { width: 88px; left: 62%; bottom: 12%; pointer-events: none; }
+
+.work-a { animation: workA 3.4s ease-in-out infinite; }
+.work-b { animation: workB 4s ease-in-out infinite; }
+.work-c { animation: workC 3.2s ease-in-out infinite; }
+@keyframes workA {
+  0%, 100% { transform: translate(0, 0) rotate(-2deg); }
+  30% { transform: translate(10px, -8px) rotate(3deg); }
+  60% { transform: translate(4px, -2px) rotate(-1deg); }
+}
+@keyframes workB {
+  0%, 100% { transform: translate(0, 0) rotate(2deg); }
+  40% { transform: translate(-12px, -6px) rotate(-3deg); }
+  70% { transform: translate(-4px, -10px) rotate(1deg); }
+}
+@keyframes workC {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-8px, -12px) scale(1.04); }
+}
+.work-spark {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f5d76e;
+  box-shadow: 0 0 10px #f5d76e;
+  pointer-events: none;
+  animation: spark 1.6s ease-in-out infinite;
+}
+.work-spark--a { left: 36%; bottom: 28%; }
+.work-spark--b { left: 58%; bottom: 22%; animation-delay: 0.5s; }
+@keyframes spark {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
 
 .dash-ui {
   position: relative;
@@ -304,8 +339,8 @@ button.actor {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: #fff8ef;
+  border: 2px solid var(--line);
   border-radius: 999px;
   padding: 0.45rem 0.9rem;
   font-family: var(--font-display);
@@ -372,22 +407,22 @@ button.actor {
 }
 
 .paper-card {
-  background:
-    linear-gradient(180deg, rgba(255, 248, 239, 0.88), rgba(243, 235, 224, 0.82));
-  border: 1px solid var(--line);
+  background: #fff8ef;
+  border: 2px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 0.75rem;
-  backdrop-filter: blur(3px);
 }
 .dash-col--left .paper-card,
 .dash-col--right .paper-card {
   max-width: 280px;
+  background: #fff8ef;
+  opacity: 1;
 }
 .dash-col--center .action-card,
 .dash-col--center .teach-card,
 .dash-col--center .power-board {
-  background: rgba(255, 248, 239, 0.94);
+  background: #fff8ef;
 }
 .paper-card h2,
 .paper-card h3 {
@@ -1010,16 +1045,17 @@ button.actor {
 
 .room-peek {
   margin: 0;
-  background: var(--card);
+  background: #fff8ef;
   border-radius: 16px;
   overflow: hidden;
-  border: 2px solid var(--line);
+  border: 2px solid var(--ink);
   box-shadow: var(--shadow);
   cursor: pointer;
   padding: 0;
   font: inherit;
   color: inherit;
   transition: transform 0.15s ease;
+  position: relative;
 }
 .room-peek:hover { transform: translateY(-3px) scale(1.02); }
 .room-peek img {
@@ -1028,12 +1064,34 @@ button.actor {
   object-fit: cover;
   display: block;
 }
+.room-peek__go {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: var(--sage-ink);
+  color: #fff8ef;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
 .room-peek figcaption {
   display: block;
   padding: 0.4rem 0.5rem 0.55rem;
   font-size: 0.78rem;
   font-weight: 800;
   text-align: center;
+}
+.room-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: #fff8ef;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
 }
 
 .room-view {
@@ -1079,6 +1137,20 @@ button.actor {
   font-weight: 800;
   font-size: 0.8rem;
 }
+.room-held {
+  background: #ffe8b8;
+  border-color: #c98a2c;
+}
+.room-view__goal {
+  position: relative;
+  z-index: 2;
+  margin: 0 1rem 0.55rem;
+  padding: 0.55rem 0.8rem;
+  background: #fff8ef;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-weight: 800;
+}
 .room-view__stage {
   position: relative;
   z-index: 1;
@@ -1086,13 +1158,129 @@ button.actor {
   display: grid;
   gap: 0.75rem;
 }
-.room-view__art {
-  width: 100%;
-  max-height: 360px;
-  object-fit: cover;
+.room-play {
+  position: relative;
   border-radius: 18px;
+  overflow: hidden;
   border: 2px solid var(--line);
   box-shadow: var(--shadow);
+  background: #1a1a1a;
+  min-height: min(52vh, 420px);
+}
+.room-view__art {
+  width: 100%;
+  height: min(52vh, 420px);
+  object-fit: cover;
+  display: block;
+}
+.room-nova {
+  position: absolute;
+  left: 6%;
+  bottom: 4%;
+  width: clamp(72px, 16vw, 120px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+  z-index: 3;
+}
+.room-nova--splash {
+  animation: room-hop 0.45s ease;
+}
+@keyframes room-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+.room-splash {
+  position: absolute;
+  left: 48%;
+  top: 42%;
+  width: 70px;
+  height: 70px;
+  margin: -35px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(120, 200, 255, 0.85), transparent 70%);
+  animation: splash-pop 0.9s ease-out forwards;
+  pointer-events: none;
+  z-index: 4;
+}
+@keyframes splash-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.room-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: grid;
+  gap: 0.15rem;
+  justify-items: center;
+  min-width: 5.5rem;
+  max-width: 7.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 2px solid #1c2a3a;
+  border-radius: 14px;
+  background: #fff8ef;
+  box-shadow: 0 4px 0 #1c2a3a;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  animation: hotspot-breathe 2.2s ease-in-out infinite;
+}
+.room-hotspot__verb {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #0b6b4f;
+}
+.room-hotspot__label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.room-hotspot.is-done {
+  background: #d9f5e5;
+  border-color: #0b6b4f;
+  box-shadow: 0 4px 0 #0b6b4f;
+  animation: none;
+}
+.room-hotspot.is-target {
+  background: #ffe8b8;
+  border-color: #c98a2c;
+  box-shadow: 0 0 0 4px rgba(201, 138, 44, 0.35), 0 4px 0 #c98a2c;
+}
+.room-hotspot.is-pulse {
+  animation: hotspot-pulse 0.55s ease;
+}
+@keyframes hotspot-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+@keyframes hotspot-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
 }
 .room-view__facts {
   list-style: none;
@@ -1102,11 +1290,34 @@ button.actor {
   gap: 0.45rem;
 }
 .room-view__facts li {
-  background: var(--cream);
+  background: #fff8ef;
   border-radius: 14px;
   border: 1px solid var(--line);
   padding: 0.7rem 0.85rem;
   font-weight: 700;
+}
+
+.jobs-list {
+  list-style: none;
+  margin: 0.55rem 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.jobs-list li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f3ebe0;
+  font-weight: 750;
+  font-size: 0.92rem;
+}
+.jobs-list li.is-on {
+  background: #d9f5e5;
+  border-color: #0b6b4f;
 }
 
 .dialogue {

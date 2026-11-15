@@ -45,6 +45,7 @@ export const STATIC_EVENTS: Event[] = [
     sourceBadge: "REFERENCE",
     explanation:
       "Mission Control's reply takes a moment. Do you wait for help or decide alone?",
+    image: eventImageFor("equatorial"),
     optionA: {
       id: "ask-earth",
       label: "Ask Earth for help",
@@ -74,6 +75,7 @@ export const STATIC_EVENTS: Event[] = [
     sourceBadge: "STORY",
     explanation:
       "A story supply ship can leave building parts — if you stop science to unload.",
+    image: eventImageFor("southPole"),
     optionA: {
       id: "take-supplies",
       label: "Take the materials",
@@ -128,6 +130,7 @@ export const STATIC_EVENTS: Event[] = [
     sourceBadge: "STORY",
     explanation:
       "Extra power is ready right now. Use it for science, or save it for later.",
+    image: eventImageFor("title"),
     optionA: {
       id: "spend-surge",
       label: "Use the extra power now",

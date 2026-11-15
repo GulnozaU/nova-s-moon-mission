@@ -11,26 +11,26 @@ import { SpaceText } from "./SpaceText";
 
 type Props = {
   event: Event;
+  day?: number;
   onConfirm: (choice: "A" | "B") => void;
   onBack: () => void;
   onOpenGlossary: () => void;
 };
 
-type Step = "story" | "options" | "predict" | "preview";
+type Step = "story" | "pick";
 
 /**
- * Decision card: What / Why / Options / optional Predict / confirm with chips.
- * Result + "What really happens" show on the day-result screen after applyDay.
+ * Kid-clear decision: story → pick A/B with help/cost → confirm.
  */
 export function DecisionTeachCard({
   event,
+  day = 1,
   onConfirm,
   onBack,
   onOpenGlossary,
 }: Props) {
   const [step, setStep] = useState<Step>("story");
   const [picked, setPicked] = useState<"A" | "B" | null>(null);
-  const [predict, setPredict] = useState<string>("");
 
   const happening = plainTalk(event.explanation);
   const why = useMemo(() => whyItMatters(event), [event]);
@@ -39,7 +39,7 @@ export function DecisionTeachCard({
   const photo =
     event.image ??
     (() => {
-      const img = nasaImageForContext(event.id);
+      const img = nasaImageForContext(event.id, day);
       return {
         slot: img.slot,
         nasaId: img.id,
@@ -54,7 +54,7 @@ export function DecisionTeachCard({
     <section className="paper-card teach-card">
       <header className="teach-card__head">
         <p className="eyebrow">
-          Decision <SourceBadge badge={event.sourceBadge} />
+          Today&apos;s choice <SourceBadge badge={event.sourceBadge} />
         </p>
         <h2>{event.title}</h2>
         <div className="teach-card__tools">
@@ -67,11 +67,11 @@ export function DecisionTeachCard({
 
       {step === "story" ? (
         <div className="teach-block">
-          <h3>1. What is happening</h3>
+          <h3>What happened?</h3>
           <p>
             <SpaceText text={happening} onOpenDrawer={onOpenGlossary} />
           </p>
-          <h3>2. Why it matters</h3>
+          <h3>Why care?</h3>
           <p>
             <SpaceText text={why} onOpenDrawer={onOpenGlossary} />
           </p>
@@ -79,24 +79,21 @@ export function DecisionTeachCard({
             <summary>How do we know?</summary>
             <p>{really}</p>
           </details>
-          <button type="button" className="btn primary" onClick={() => setStep("options")}>
-            See options →
+          <button type="button" className="btn primary" onClick={() => setStep("pick")}>
+            Pick what to do →
           </button>
         </div>
       ) : null}
 
-      {step === "options" ? (
+      {step === "pick" ? (
         <div className="teach-block">
-          <h3>3. Your options</h3>
-          <p className="muted">Tap one to preview what it adds and takes.</p>
+          <h3>Pick one</h3>
+          <p className="muted">Green = helps. Red = costs. Tap one, then confirm.</p>
           <div className="trade-options">
             <button
               type="button"
               className={`trade-btn ${picked === "A" ? "is-picked" : ""}`}
-              onClick={() => {
-                setPicked("A");
-                setStep("predict");
-              }}
+              onClick={() => setPicked("A")}
             >
               <strong>{event.optionA.label}</strong>
               <span className="helps">↑ Helps: {plainTalk(event.optionA.benefit)}</span>
@@ -105,76 +102,38 @@ export function DecisionTeachCard({
             <button
               type="button"
               className={`trade-btn ${picked === "B" ? "is-picked" : ""}`}
-              onClick={() => {
-                setPicked("B");
-                setStep("predict");
-              }}
+              onClick={() => setPicked("B")}
             >
               <strong>{event.optionB.label}</strong>
               <span className="helps">↑ Helps: {plainTalk(event.optionB.benefit)}</span>
               <span className="costs">↓ Costs: {plainTalk(event.optionB.cost)}</span>
             </button>
           </div>
+          {picked ? (
+            <>
+              <CostChips option={picked === "A" ? event.optionA : event.optionB} />
+              <div className="row-actions">
+                <button type="button" className="btn ghost" onClick={() => setPicked(null)}>
+                  Pick again
+                </button>
+                <button
+                  type="button"
+                  className="btn primary pulse"
+                  onClick={() => onConfirm(picked)}
+                >
+                  Do this!
+                </button>
+              </div>
+            </>
+          ) : null}
           <button type="button" className="btn ghost" onClick={() => setStep("story")}>
             Back
           </button>
         </div>
       ) : null}
 
-      {step === "predict" && picked ? (
-        <div className="teach-block">
-          <h3>4. Predict (optional)</h3>
-          <p>What do you think happens to your water?</p>
-          <div className="predict-row">
-            {["Goes up", "Goes down", "Stays about the same"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`tap-chip ${predict === p ? "is-on" : ""}`}
-                onClick={() => setPredict(p)}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => setStep("preview")}
-          >
-            {predict ? "Preview cost →" : "Skip predict →"}
-          </button>
-          <button type="button" className="btn ghost" onClick={() => setStep("options")}>
-            Back
-          </button>
-        </div>
-      ) : null}
-
-      {step === "preview" && picked ? (
-        <div className="teach-block">
-          <h3>Cost preview</h3>
-          <p>
-            You picked <strong>{picked === "A" ? event.optionA.label : event.optionB.label}</strong>
-            {predict ? ` · You guessed water: ${predict}` : null}
-          </p>
-          <CostChips option={picked === "A" ? event.optionA : event.optionB} />
-          <div className="row-actions">
-            <button type="button" className="btn ghost" onClick={() => setStep("options")}>
-              Pick again
-            </button>
-            <button
-              type="button"
-              className="btn primary pulse"
-              onClick={() => onConfirm(picked)}
-            >
-              Confirm choice
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       <button type="button" className="btn ghost" onClick={onBack}>
-        Back to power
+        Back to jobs
       </button>
     </section>
   );

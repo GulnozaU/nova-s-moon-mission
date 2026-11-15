@@ -1,11 +1,13 @@
-/** Storybook art. Cutouts = white backdrop removed (transparent PNG). */
+/** Storybook art. Cutouts = backdrop removed (transparent PNG, white suits kept). */
 
 const C = "/art/cutouts";
+/** Bust browser cache after rembg re-export of white suits. */
+const V = "?v=white-suit";
 
 export const ART = {
-  nova: `${C}/nova-astronaut-boy.png`,
-  novaGirlHelmet: `${C}/astronaut-girl-with-helmet.png`,
-  novaGirlGlasses: `${C}/astronaut-girl-with-glasses.png`,
+  nova: `${C}/nova-astronaut-boy.png${V}`,
+  novaGirlHelmet: `${C}/astronaut-girl-with-helmet.png${V}`,
+  novaGirlGlasses: `${C}/astronaut-girl-with-glasses.png${V}`,
   lab: "/art/science-lab-nova-notebook.jpeg",
   bunks: "/art/crew-quarters-bunks.jpeg",
   greenhouseIn: "/art/greenhouse-interior.jpeg",

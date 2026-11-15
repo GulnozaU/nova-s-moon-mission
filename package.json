@@ -13,6 +13,7 @@
     "find-images": "npx --yes tsx scripts/find-images.ts"
   },
   "dependencies": {
+    "phaser": "^3.80.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

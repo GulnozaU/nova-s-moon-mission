@@ -20,11 +20,12 @@ export function plannedPowerCost(d: DayDecisions): number {
 }
 
 export function defaultDecisions(): DayDecisions {
+  // Start empty so kids walk rooms and turn jobs on (like a real adventure game).
   return {
-    recycler: true,
-    oxygenMaker: true,
-    comms: true,
-    scienceLevel: 1,
+    recycler: false,
+    oxygenMaker: false,
+    comms: false,
+    scienceLevel: 0,
     greenhouse: false,
     buildShield: false,
     buildPanel: false,

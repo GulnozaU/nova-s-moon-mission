@@ -19,7 +19,10 @@ import { CardNasaImage } from "./CardNasaImage";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { plannedPowerCost } from "./powerMath";
-import { nasaImageForContext } from "../content/imageForContext";
+import {
+  nasaImageForContext,
+  nasaImageForDay,
+} from "../content/imageForContext";
 import { DecisionTeachCard } from "./teach/DecisionTeachCard";
 import { isDaylight, sunBarLabel } from "./teach/dayNight";
 import { RoomView, type RoomId } from "./teach/RoomView";
@@ -71,23 +74,44 @@ export function MissionDashboard({
   const weatherLine = plainTalk(
     `NASA saw a ${stormSize} storm on the Sun. The storm cloud may reach the Moon in about ${warning.warningDays} day${warning.warningDays === 1 ? "" : "s"}.`,
   );
-  const contextPhoto = nasaImageForContext(
-    event?.id ?? (mode === "power" ? "weather" : "weather"),
-  );
-  const contextPlain =
-    event?.id === "lunar-dust"
-      ? "Apollo crews found Moon dust stuck to suits and machines."
-      : event?.id === "greenhouse-experiment"
-        ? "Scientists grew plants with lunar material. Here is one finding."
-        : event?.id === "solar-storm"
-          ? weatherLine
-          : "NASA watches the Sun so crews can get ready.";
+
+  const nasaStill = event
+    ? nasaImageForContext(event.id, state.day)
+    : mode === "power"
+      ? nasaImageForContext("weather", state.day)
+      : nasaImageForDay(state.day);
+  const contextPhoto = event?.image ?? {
+    slot: nasaStill.slot,
+    nasaId: nasaStill.id,
+    src: nasaStill.file,
+    alt: nasaStill.alt,
+    credit: nasaStill.credit,
+    pageUrl: nasaStill.pageUrl,
+  };
+
+  const contextPlain = event
+    ? plainTalk(
+        event.id === "lunar-dust"
+          ? "Apollo crews found Moon dust stuck to suits and machines."
+          : event.id === "greenhouse-experiment"
+            ? "Scientists grew plants with lunar material. Here is one finding."
+            : event.id === "solar-storm"
+              ? weatherLine
+              : event.explanation,
+      )
+    : nasaCaptionForDay(state.day);
+
+  const canActInRooms = mode === "explore" || mode === "power";
 
   if (room) {
     return (
       <RoomView
+        key={room}
         room={room}
         isDay={dayLit}
+        decisions={decisions}
+        onDecisions={onDecisions}
+        canAct={canActInRooms}
         onClose={() => setRoom(null)}
         onOpenGlossary={onOpenGlossary}
       />
@@ -121,15 +145,18 @@ export function MissionDashboard({
           type="button"
           className="actor actor--green bob"
           onClick={() => setRoom("greenhouse")}
-          aria-label="Open gardenhouse"
+          aria-label="Open greenhouse"
         >
           <img src={ART.greenhouseDome} alt="" />
         </button>
         <img className="actor actor--panels shimmer" src={ART.panels} alt="" />
         <img className="actor actor--dish spin-slow" src={ART.dish} alt="" />
         <img className="actor actor--rover drive" src={ART.rover} alt="" />
-        <img className="actor actor--nova bounce" src={ART.nova} alt="" />
-        <img className="actor actor--girl sway" src={ART.novaGirlHelmet} alt="" />
+        <img className="actor actor--nova work-a" src={ART.nova} alt="" />
+        <img className="actor actor--girl work-b" src={ART.novaGirlHelmet} alt="" />
+        <img className="actor actor--worker work-c" src={ART.novaGirlGlasses} alt="" />
+        <div className="work-spark work-spark--a" aria-hidden="true" />
+        <div className="work-spark work-spark--b" aria-hidden="true" />
       </div>
 
       <div className="dash-ui">
@@ -172,10 +199,10 @@ export function MissionDashboard({
                       mode === "choose"
                         ? "Read both sides. Every choice helps and costs."
                         : mode === "power"
-                          ? `You have ${powerToday} power. Heat needs ${HEAT_COST}.`
+                          ? `Walk into a room and DO jobs. You have ${powerToday} power. Heat always uses ${HEAT_COST}.`
                           : dayLit
-                            ? "Sunny now — good time for careful work!"
-                            : "Night on the plain — save power chips."
+                            ? "Tap a door below. Go inside and grab things!"
+                            : "Night on the plain — save power. Still go inside and choose jobs carefully."
                     }
                     onOpenDrawer={onOpenGlossary}
                   />
@@ -211,132 +238,84 @@ export function MissionDashboard({
             <div className="room-row">
               <button type="button" className="room-peek" onClick={() => setRoom("home")}>
                 <img src={ART.bunks} alt="" />
-                <figcaption>Go in · Crew home</figcaption>
+                <span className="room-peek__go">Go inside · grab wrench</span>
+                <figcaption>Crew home</figcaption>
               </button>
               <button type="button" className="room-peek" onClick={() => setRoom("greenhouse")}>
                 <img src={ART.greenhouseIn} alt="" />
-                <figcaption>Go in · Gardenhouse</figcaption>
+                <span className="room-peek__go">Go inside · add water</span>
+                <figcaption>Greenhouse</figcaption>
               </button>
               <button type="button" className="room-peek" onClick={() => setRoom("lab")}>
                 <img src={ART.lab} alt="" />
-                <figcaption>Go in · Science lab</figcaption>
+                <span className="room-peek__go">Go inside · plan walk</span>
+                <figcaption>Science lab</figcaption>
               </button>
             </div>
+            <p className="room-hint">
+              Real game play: walk in → grab a tool → tap what you want to use.
+            </p>
 
             {mode === "explore" ? (
               <div className="paper-card action-card">
-                <h2>Ready for Day {state.day}?</h2>
+                <h2>Day {state.day}: do jobs with Nova</h2>
                 <p className="trade-hint">
                   <SpaceText
-                    text="First spend power. Then a choice with a clear help and cost."
+                    text="Do not only press a big button. Go inside a room. Grab. Add water. Flip machines."
                     onOpenDrawer={onOpenGlossary}
                   />
                 </p>
+                <JobsChecklist decisions={decisions} />
                 <div className="world-taps">
-                  <button type="button" className="tap-chip" onClick={onPlanPower}>
-                    <img src={ART.panels} alt="" className="shimmer" />
-                    Power plan
+                  <button type="button" className="tap-chip" onClick={() => setRoom("home")}>
+                    <img src={ART.bunks} alt="" />
+                    Fix machines
                   </button>
                   <button type="button" className="tap-chip" onClick={() => setRoom("greenhouse")}>
                     <img src={ART.greenhouseDome} alt="" className="bob" />
-                    Visit plants
+                    Water plants
                   </button>
                   <button type="button" className="tap-chip" onClick={() => setRoom("lab")}>
                     <img src={ART.novaGirlGlasses} alt="" className="sway" />
-                    Visit lab
+                    Plan science
                   </button>
                 </div>
                 <button type="button" className="btn primary wide pulse" onClick={onPlanPower}>
-                  Plan today&apos;s power →
+                  Check power used →
                 </button>
               </div>
             ) : null}
 
             {mode === "power" ? (
               <div className="paper-card action-card power-board">
-                <h2>Spend your {powerToday} power</h2>
+                <h2>Power check</h2>
                 <p>
-                  Using <strong>{spent}</strong> · left for battery{" "}
+                  Using <strong>{spent}</strong> of {powerToday} · left for battery{" "}
                   <strong>{Math.max(0, left)}</strong>{" "}
                   <SourceBadge badge="ASSUMPTION" />
                 </p>
-                <div className="power-grid">
-                  <Toggle forced on icon={ART.iconSun} title="Heat" help="Keeps the crew warm" cost={`Always ${HEAT_COST} power`} />
-                  <Toggle
-                    on={decisions.recycler}
-                    icon={ART.iconWater}
-                    title="Water cleaner"
-                    help="Uses only 1 water instead of 4"
-                    cost={`${RECYCLER_COST} power`}
-                    onClick={() => onDecisions({ ...decisions, recycler: !decisions.recycler })}
-                  />
-                  <Toggle
-                    on={decisions.oxygenMaker}
-                    icon={ART.iconLeaf}
-                    title="Air maker"
-                    help="+3 oxygen"
-                    cost={`${OXYGEN_MAKER_COST} power + 1 water`}
-                    onClick={() =>
-                      onDecisions({ ...decisions, oxygenMaker: !decisions.oxygenMaker })
-                    }
-                  />
-                  <Toggle
-                    on={decisions.comms}
-                    icon={ART.dish}
-                    title="Talk to Earth"
-                    help="Full storm warning time"
-                    cost={`${COMMS_COST} power`}
-                    onClick={() => onDecisions({ ...decisions, comms: !decisions.comms })}
-                  />
-                  <Toggle
-                    on={Boolean(decisions.greenhouse)}
-                    icon={ART.greenhouseDome}
-                    title="Greenhouse"
-                    help="+1 oxygen and +1 science"
-                    cost={`${GREENHOUSE_COST} power + 2 water`}
-                    onClick={() =>
-                      onDecisions({ ...decisions, greenhouse: !decisions.greenhouse })
-                    }
-                  />
-                </div>
-                <div className="science-row">
-                  <span>Outside science</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onDecisions({
-                        ...decisions,
-                        scienceLevel: Math.max(0, decisions.scienceLevel - 1),
-                      })
-                    }
-                  >
-                    −
+                <p className="trade-hint">
+                  Change a job by going back into a room. Heat always stays on (
+                  {HEAT_COST} power).
+                </p>
+                <JobsChecklist decisions={decisions} detailed />
+                <div className="world-taps">
+                  <button type="button" className="tap-chip" onClick={() => setRoom("home")}>
+                    Crew home
                   </button>
-                  <strong>
-                    {decisions.scienceLevel}/{SCIENCE_LEVEL_MAX}
-                  </strong>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onDecisions({
-                        ...decisions,
-                        scienceLevel: Math.min(
-                          SCIENCE_LEVEL_MAX,
-                          decisions.scienceLevel + 1,
-                        ),
-                      })
-                    }
-                  >
-                    +
+                  <button type="button" className="tap-chip" onClick={() => setRoom("greenhouse")}>
+                    Greenhouse
                   </button>
-                  <small>
-                    ↑ more science · ↓ {SCIENCE_COST_PER_LEVEL} power each + a little risk
-                  </small>
+                  <button type="button" className="tap-chip" onClick={() => setRoom("lab")}>
+                    Science lab
+                  </button>
                 </div>
-                {left < 0 ? <p className="warn">Too much power — turn something off.</p> : null}
+                {left < 0 ? (
+                  <p className="warn">Too much power — go turn something off in a room.</p>
+                ) : null}
                 <div className="row-actions">
                   <button type="button" className="btn ghost" onClick={onBackExplore}>
-                    Back
+                    Keep working
                   </button>
                   <button
                     type="button"
@@ -344,7 +323,7 @@ export function MissionDashboard({
                     disabled={left < 0}
                     onClick={onReadyForEvent}
                   >
-                    See the trade-off →
+                    See today&apos;s choice →
                   </button>
                 </div>
               </div>
@@ -353,6 +332,7 @@ export function MissionDashboard({
             {mode === "choose" && event ? (
               <DecisionTeachCard
                 event={event}
+                day={state.day}
                 onConfirm={onChoose}
                 onBack={onBackExplore}
                 onOpenGlossary={onOpenGlossary}
@@ -398,24 +378,14 @@ export function MissionDashboard({
 
             <div className="paper-card science-box">
               <h3>Today&apos;s NASA picture</h3>
-              <CardNasaImage
-                image={{
-                  slot: contextPhoto.slot,
-                  nasaId: contextPhoto.id,
-                  src: contextPhoto.file,
-                  alt: contextPhoto.alt,
-                  credit: contextPhoto.credit,
-                  pageUrl: contextPhoto.pageUrl,
-                }}
-                className="science-box__photo"
-              />
+              <CardNasaImage image={contextPhoto} className="science-box__photo" />
               <p>
                 <SpaceText text={contextPlain} onOpenDrawer={onOpenGlossary} />
               </p>
               <details className="how-know">
                 <summary>How do we know?</summary>
                 <p>
-                  {contextPhoto.title} ({contextPhoto.id}). {contextPhoto.credit}
+                  {nasaStill.title} ({contextPhoto.nasaId}). {contextPhoto.credit}
                 </p>
               </details>
             </div>
@@ -431,7 +401,7 @@ export function MissionDashboard({
                     .reverse()
                     .map((d) => (
                       <li key={d.day}>
-                        Day {d.day}: {d.eventId} → {d.choice}
+                        Day {d.day}: {kidEventName(d.eventId)} → {d.choice}
                       </li>
                     ))
                 )}
@@ -442,6 +412,80 @@ export function MissionDashboard({
       </div>
     </section>
   );
+}
+
+function JobsChecklist({
+  decisions,
+  detailed,
+}: {
+  decisions: DayDecisions;
+  detailed?: boolean;
+}) {
+  const jobs = [
+    {
+      on: true,
+      label: detailed ? `Heat (always ${HEAT_COST} power)` : "Heat on",
+    },
+    {
+      on: decisions.recycler,
+      label: detailed
+        ? `Water cleaner (${RECYCLER_COST} power) — crew home`
+        : "Water cleaner",
+    },
+    {
+      on: decisions.oxygenMaker,
+      label: detailed
+        ? `Air maker (${OXYGEN_MAKER_COST} power) — crew home`
+        : "Air maker",
+    },
+    {
+      on: decisions.comms,
+      label: detailed ? `Talk to Earth (${COMMS_COST} power) — crew home` : "Talk to Earth",
+    },
+    {
+      on: Boolean(decisions.greenhouse),
+      label: detailed
+        ? `Greenhouse (${GREENHOUSE_COST} power + 2 water)`
+        : "Water plants",
+    },
+    {
+      on: decisions.scienceLevel > 0,
+      label: detailed
+        ? `Science walks ×${decisions.scienceLevel} (${SCIENCE_COST_PER_LEVEL} each, max ${SCIENCE_LEVEL_MAX})`
+        : `Science walks ×${decisions.scienceLevel}`,
+    },
+  ];
+  return (
+    <ul className="jobs-list">
+      {jobs.map((j) => (
+        <li key={j.label} className={j.on ? "is-on" : ""}>
+          <span aria-hidden="true">{j.on ? "☑" : "☐"}</span> {j.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function nasaCaptionForDay(day: number): string {
+  const caps = [
+    "Earth hangs in the Moon sky — our home is far away.",
+    "The Sun can throw storm clouds. NASA watches every day.",
+    "Near the south pole, some crater rims stay sunny.",
+    "Wide Moon plains look quiet — but power changes with night.",
+    "Moon dust sticks to suits and machines.",
+    "NASA grew plants with lunar material in a lab on Earth.",
+  ];
+  return caps[(day - 1) % caps.length]!;
+}
+
+function kidEventName(id: string): string {
+  if (id === "solar-storm") return "Sun storm";
+  if (id === "lunar-dust") return "Moon dust";
+  if (id === "greenhouse-experiment") return "Plant day";
+  if (id === "delayed-message") return "Earth message";
+  if (id === "supply-drop") return "Supply drop";
+  if (id === "battery-surge") return "Extra power";
+  return id;
 }
 
 function Meter({
@@ -468,43 +512,5 @@ function Meter({
         {label} {Math.round((value / max) * 100)}%
       </span>
     </div>
-  );
-}
-
-function Toggle({
-  on,
-  forced,
-  icon,
-  title,
-  help,
-  cost,
-  onClick,
-}: {
-  on: boolean;
-  forced?: boolean;
-  icon: string;
-  title: string;
-  help: string;
-  cost: string;
-  onClick?: () => void;
-}) {
-  const inner = (
-    <>
-      <img src={icon} alt="" />
-      <div>
-        <strong>{title}</strong>
-        <span className="helps">↑ {help}</span>
-        <span className="costs">↓ {cost}</span>
-      </div>
-      <em>{forced ? "ON" : on ? "ON" : "off"}</em>
-    </>
-  );
-  if (forced || !onClick) {
-    return <div className={`toggle ${on ? "is-on" : ""} is-forced`}>{inner}</div>;
-  }
-  return (
-    <button type="button" className={`toggle ${on ? "is-on" : ""}`} onClick={onClick}>
-      {inner}
-    </button>
   );
 }

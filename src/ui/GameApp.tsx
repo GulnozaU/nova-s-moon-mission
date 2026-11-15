@@ -2,7 +2,7 @@ import { CardNasaImage } from "./CardNasaImage";
 import { DayResultView } from "./DayResult";
 import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
-import { MissionDashboard } from "./MissionDashboard";
+import { PhaserPlay } from "../game/PhaserPlay";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { getNasaImage } from "../content/images";
@@ -19,8 +19,8 @@ const TRAINING = [
     nasaSlot: "title" as const,
     lines: [
       { text: "Hello! I am Nova." },
-      { text: "Power is limited each day." },
-      { text: "Heat always needs some chips." },
+      { text: "You will walk me around the Moon base." },
+      { text: "Use arrows or WASD. Press SPACE near doors and tools." },
     ],
   },
   {
@@ -92,7 +92,7 @@ export function GameApp() {
               <DialogueBox
                 lines={[
                   { text: "Hello! I am Nova." },
-                  { text: "Can you help me run this Moon base?" },
+                  { text: "Walk me around the base — grab tools, water plants, run machines!" },
                 ]}
                 onDone={g.startTraining}
               />
@@ -216,7 +216,7 @@ export function GameApp() {
         {(g.phase === "base" || g.phase === "power" || g.phase === "event") &&
         g.state &&
         g.weather ? (
-          <MissionDashboard
+          <PhaserPlay
             state={g.state}
             weather={g.weather}
             event={g.todaysEvent}
@@ -228,9 +228,6 @@ export function GameApp() {
             onReadyForEvent={g.goEvent}
             onChoose={g.chooseEvent}
             onOpenGlossary={() => g.setGlossaryOpen(true)}
-            onBackExplore={() =>
-              g.setPhase(g.phase === "event" ? "power" : "base")
-            }
           />
         ) : null}
 

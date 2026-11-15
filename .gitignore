@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local image tooling / Python venvs (never commit — GitHub 100MB limit)
+.venv-img/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
