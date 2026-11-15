@@ -24,8 +24,8 @@ export function LegendScreen({ onBack }: Props) {
     <section className="panel legend-screen">
       <header className="panel__head">
         <div>
-          <h2>What is real and what is simplified</h2>
-          <p>Every number in the game wears a badge.</p>
+          <h2>About the data</h2>
+          <p>Where numbers and pictures come from.</p>
         </div>
       </header>
 
@@ -38,14 +38,14 @@ export function LegendScreen({ onBack }: Props) {
         ))}
       </ul>
 
-      <h3>NASA pictures</h3>
+      <h3>NASA pictures used</h3>
       <ul className="legend-sources">
         {images.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
 
-      <h3>OSDR studies</h3>
+      <h3>Plant studies (OSDR)</h3>
       <ul className="legend-sources">
         {studies.map((s) => (
           <li key={s.id}>
@@ -53,10 +53,6 @@ export function LegendScreen({ onBack }: Props) {
           </li>
         ))}
       </ul>
-
-      <p className="legend-disclaimer">
-        Real data from NASA. This game is not made or endorsed by NASA.
-      </p>
 
       <div className="panel__actions">
         <button type="button" className="btn primary" onClick={onBack}>

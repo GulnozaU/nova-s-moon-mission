@@ -32,7 +32,7 @@ export function DialogueBox({
       onDone?.();
       return;
     }
-    setI(i + 1);
+    setI((prev) => prev + 1);
   };
 
   return (

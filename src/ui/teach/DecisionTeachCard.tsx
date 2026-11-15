@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Event } from "../../types";
 import { plainTalk } from "../../content/banned";
+import { nasaImageForContext } from "../../content/imageForContext";
 import { CardNasaImage } from "../CardNasaImage";
 import { SourceBadge } from "../SourceBadge";
 import { AskNova } from "./AskNova";
@@ -35,6 +36,19 @@ export function DecisionTeachCard({
   const why = useMemo(() => whyItMatters(event), [event]);
   const really = plainTalk(event.realWorldNote);
   const readText = `${happening} ${why}`;
+  const photo =
+    event.image ??
+    (() => {
+      const img = nasaImageForContext(event.id);
+      return {
+        slot: img.slot,
+        nasaId: img.id,
+        src: img.file,
+        alt: img.alt,
+        credit: img.credit,
+        pageUrl: img.pageUrl,
+      };
+    })();
 
   return (
     <section className="paper-card teach-card">
@@ -49,9 +63,7 @@ export function DecisionTeachCard({
         </div>
       </header>
 
-      {event.image ? (
-        <CardNasaImage image={event.image} className="teach-card__photo" />
-      ) : null}
+      <CardNasaImage image={photo} className="teach-card__photo" />
 
       {step === "story" ? (
         <div className="teach-block">

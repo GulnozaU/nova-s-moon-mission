@@ -107,9 +107,9 @@ export function EndReport({ state, result, onReplay, onLegend }: Props) {
         <button type="button" className="btn primary" onClick={onReplay}>
           Try a different strategy
         </button>
-        <button type="button" className="btn ghost" onClick={onLegend}>
-          What is real?
-        </button>
+              <button type="button" className="btn ghost" onClick={onLegend}>
+                About the data
+              </button>
       </div>
     </section>
   );

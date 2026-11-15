@@ -12,11 +12,11 @@ import { EndReport } from "./teach/EndReport";
 import { SpaceText } from "./teach/SpaceText";
 import "./game.css";
 
+/** One idea per screen — Nova says it; no duplicate body text. */
 const TRAINING = [
   {
-    title: "Power is limited",
-    body: "You get a few power chips each day. Heat always needs some.",
     art: ART.panels,
+    nasaSlot: "title" as const,
     lines: [
       { text: "Hello! I am Nova." },
       { text: "Power is limited each day." },
@@ -24,9 +24,8 @@ const TRAINING = [
     ],
   },
   {
-    title: "Water and air run out",
-    body: "Turn on the water cleaner and air maker, or tanks drop fast.",
     art: ART.waterTower,
+    nasaSlot: "greenhouse" as const,
     lines: [
       { text: "Water and air can run out." },
       { text: "The water cleaner saves water." },
@@ -34,9 +33,8 @@ const TRAINING = [
     ],
   },
   {
-    title: "Space weather can hurt",
-    body: "NASA watches the Sun. A storm day can hurt if you stay outside.",
     art: ART.iconSun,
+    nasaSlot: "storm" as const,
     lines: [
       { text: "Space weather can hurt the crew." },
       { text: "NASA watches storms on the Sun." },
@@ -49,6 +47,11 @@ export function GameApp() {
   const g = useGameSession();
   const dashMode =
     g.phase === "power" ? "power" : g.phase === "event" ? "choose" : "explore";
+
+  const advanceTraining = () => {
+    if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
+    else g.setTrainingStep(g.trainingStep + 1);
+  };
 
   return (
     <div className="nova-app">
@@ -65,7 +68,7 @@ export function GameApp() {
             Space words
           </button>
           <button type="button" className="btn ghost" onClick={g.openLegend}>
-            What is real?
+            About the data
           </button>
         </nav>
       </header>
@@ -85,65 +88,48 @@ export function GameApp() {
               <CardNasaImage slot="title" className="welcome-hero__nasa" />
             </div>
             <div className="welcome-copy">
-              <p className="eyebrow">Real data from NASA</p>
               <h1>Can you help Nova for 10 days?</h1>
               <DialogueBox
                 lines={[
                   { text: "Hello! I am Nova." },
                   { text: "Can you help me run this Moon base?" },
                 ]}
+                onDone={g.startTraining}
               />
-              <div className="panel__actions">
-                <button type="button" className="btn primary pulse" onClick={g.startTraining}>
-                  Start training day
-                </button>
-                <button type="button" className="btn ghost" onClick={g.openLegend}>
-                  Badge legend
-                </button>
-              </div>
             </div>
           </section>
         ) : null}
 
         {g.phase === "training" ? (
-          <section className="screen training-screen panel">
+          <section className="screen training-lesson">
             <p className="eyebrow">
-              Training Day · {g.trainingStep + 1} / {TRAINING.length} · nothing scored
+              Training Day · {g.trainingStep + 1} / {TRAINING.length}
             </p>
-            <img
-              src={TRAINING[g.trainingStep]!.art}
-              alt=""
-              className="training-art bob"
-            />
-            <h2>{TRAINING[g.trainingStep]!.title}</h2>
-            <p>
-              <SpaceText
-                text={TRAINING[g.trainingStep]!.body}
-                onOpenDrawer={() => g.setGlossaryOpen(true)}
+            <div className="training-lesson__stage">
+              <img
+                src={TRAINING[g.trainingStep]!.art}
+                alt=""
+                className="training-lesson__art bob"
               />
-            </p>
-            <DialogueBox key={g.trainingStep} lines={TRAINING[g.trainingStep]!.lines} />
-            <div className="panel__actions">
-              {g.trainingStep > 0 ? (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => g.setTrainingStep(g.trainingStep - 1)}
-                >
-                  Back
-                </button>
-              ) : null}
+              <CardNasaImage
+                slot={TRAINING[g.trainingStep]!.nasaSlot}
+                className="training-lesson__nasa"
+              />
+            </div>
+            <DialogueBox
+              key={g.trainingStep}
+              lines={TRAINING[g.trainingStep]!.lines}
+              onDone={advanceTraining}
+            />
+            {g.trainingStep > 0 ? (
               <button
                 type="button"
-                className="btn primary"
-                onClick={() => {
-                  if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
-                  else g.setTrainingStep(g.trainingStep + 1);
-                }}
+                className="btn ghost"
+                onClick={() => g.setTrainingStep(g.trainingStep - 1)}
               >
-                {g.trainingStep >= TRAINING.length - 1 ? "Pick a site" : "Next idea"}
+                Back
               </button>
-            </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -206,8 +192,8 @@ export function GameApp() {
         {g.phase === "loading" ? (
           <section className="screen panel loading-screen" aria-busy="true">
             <img src={ART.rover} alt="" className="drive" />
-            <h2>Talking to NASA data…</h2>
-            <p>Loading space weather and plant studies. No login.</p>
+            <h2>Loading space weather…</h2>
+            <p>Fetching storm notes and plant studies. No login.</p>
           </section>
         ) : null}
 
@@ -293,9 +279,10 @@ export function GameApp() {
                 Close
               </button>
             </header>
+            <CardNasaImage slot="storm" />
             <p>
               <SpaceText
-                text={`Scientists grew plants for study ${g.schedule.radiationStudy.id}. ${g.schedule.radiationStudy.finding}`}
+                text={`Scientists studied plants in study ${g.schedule.radiationStudy.id}. ${g.schedule.radiationStudy.finding}`}
                 onOpenDrawer={() => g.setGlossaryOpen(true)}
               />
             </p>
@@ -314,10 +301,6 @@ export function GameApp() {
       ) : null}
 
       <GlossaryDrawer open={g.glossaryOpen} onClose={() => g.setGlossaryOpen(false)} />
-
-      <footer className="nova-foot">
-        Real data from NASA. Not made or endorsed by NASA.
-      </footer>
     </div>
   );
 }

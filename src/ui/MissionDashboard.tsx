@@ -19,6 +19,7 @@ import { CardNasaImage } from "./CardNasaImage";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { plannedPowerCost } from "./powerMath";
+import { nasaImageForContext } from "../content/imageForContext";
 import { DecisionTeachCard } from "./teach/DecisionTeachCard";
 import { isDaylight, sunBarLabel } from "./teach/dayNight";
 import { RoomView, type RoomId } from "./teach/RoomView";
@@ -70,6 +71,17 @@ export function MissionDashboard({
   const weatherLine = plainTalk(
     `NASA saw a ${stormSize} storm on the Sun. The storm cloud may reach the Moon in about ${warning.warningDays} day${warning.warningDays === 1 ? "" : "s"}.`,
   );
+  const contextPhoto = nasaImageForContext(
+    event?.id ?? (mode === "power" ? "weather" : "weather"),
+  );
+  const contextPlain =
+    event?.id === "lunar-dust"
+      ? "Apollo crews found Moon dust stuck to suits and machines."
+      : event?.id === "greenhouse-experiment"
+        ? "Scientists grew plants with lunar material. Here is one finding."
+        : event?.id === "solar-storm"
+          ? weatherLine
+          : "NASA watches the Sun so crews can get ready.";
 
   if (room) {
     return (
@@ -84,14 +96,35 @@ export function MissionDashboard({
 
   return (
     <section className={`dash ${dayLit ? "is-day" : "is-night"}`}>
-      <div className="dash-world" aria-hidden="true">
+      <div className="dash-world">
         <img className="dash-world__bg" src={ART.lunarSurface} alt="" />
         <div className="dash-world__haze" />
         <div className="sky-cycle" />
         <img className="actor actor--earth sway" src={ART.earthMoon} alt="" />
-        <img className="actor actor--habitat breathe" src={ART.habitatDome} alt="" />
-        <img className="actor actor--lab breathe-delay" src={ART.cottage} alt="" />
-        <img className="actor actor--green bob" src={ART.greenhouseDome} alt="" />
+        <button
+          type="button"
+          className="actor actor--habitat breathe"
+          onClick={() => setRoom("home")}
+          aria-label="Open crew home"
+        >
+          <img src={ART.habitatDome} alt="" />
+        </button>
+        <button
+          type="button"
+          className="actor actor--lab breathe-delay"
+          onClick={() => setRoom("lab")}
+          aria-label="Open science lab"
+        >
+          <img src={ART.cottage} alt="" />
+        </button>
+        <button
+          type="button"
+          className="actor actor--green bob"
+          onClick={() => setRoom("greenhouse")}
+          aria-label="Open gardenhouse"
+        >
+          <img src={ART.greenhouseDome} alt="" />
+        </button>
         <img className="actor actor--panels shimmer" src={ART.panels} alt="" />
         <img className="actor actor--dish spin-slow" src={ART.dish} alt="" />
         <img className="actor actor--rover drive" src={ART.rover} alt="" />
@@ -364,11 +397,27 @@ export function MissionDashboard({
             </div>
 
             <div className="paper-card science-box">
-              <h3>Real space picture</h3>
-              <CardNasaImage slot="storm" className="science-box__photo" />
-              <p className="muted">
-                Real data from NASA. Not made or endorsed by NASA.
+              <h3>Today&apos;s NASA picture</h3>
+              <CardNasaImage
+                image={{
+                  slot: contextPhoto.slot,
+                  nasaId: contextPhoto.id,
+                  src: contextPhoto.file,
+                  alt: contextPhoto.alt,
+                  credit: contextPhoto.credit,
+                  pageUrl: contextPhoto.pageUrl,
+                }}
+                className="science-box__photo"
+              />
+              <p>
+                <SpaceText text={contextPlain} onOpenDrawer={onOpenGlossary} />
               </p>
+              <details className="how-know">
+                <summary>How do we know?</summary>
+                <p>
+                  {contextPhoto.title} ({contextPhoto.id}). {contextPhoto.credit}
+                </p>
+              </details>
             </div>
 
             <div className="paper-card log-box">
