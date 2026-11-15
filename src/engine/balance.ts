@@ -6,7 +6,7 @@
 import { applyDay } from "./applyDay";
 import { MISSION_DAYS } from "./constants";
 import { createGame } from "./createGame";
-import { createRng, rngInt } from "./rng";
+import { rngInt } from "./rng";
 import type { DayDecisions, StormEvent } from "./types";
 import type { SiteId } from "../types";
 

@@ -268,18 +268,19 @@ export function applyDay(
   };
 
   let effects = { ...option.effects };
+  const riskMaterials = effects.riskMaterials;
   if (
     effects.riskChance !== undefined &&
-    effects.riskMaterials !== undefined &&
+    riskMaterials !== undefined &&
     rng &&
     rng() < effects.riskChance
   ) {
     effects = {
       ...effects,
-      materials: (effects.materials ?? 0) + effects.riskMaterials,
+      materials: (effects.materials ?? 0) + riskMaterials,
     };
     notes.push(
-      `Mistake risk hit — lost ${Math.abs(effects.riskMaterials)} materials.`,
+      `Mistake risk hit — lost ${Math.abs(riskMaterials)} materials.`,
     );
   }
   const applied = applyEffects(next, effects);
