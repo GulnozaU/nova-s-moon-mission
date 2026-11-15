@@ -88,6 +88,16 @@ export type DifficultyConfig = {
   shelterExposureFactor: number;
   /** Non-storm outdoor exposure. ASSUMPTION */
   normalOutsideExposure: number;
+  /**
+   * Extra crew risk each day while shieldLevel is 0 (unshielded habitat).
+   * Pushes "shelter only, never build" strategies below 90% wins. ASSUMPTION (Stage 1).
+   */
+  unshieldedDailyExposure: number;
+
+  /** Clean clogged filter: materials. ASSUMPTION */
+  cleanFilterMaterialCost: number;
+  /** Clean clogged filter: power from day's pool. ASSUMPTION */
+  cleanFilterPowerCost: number;
 
   /** Lose thresholds. ASSUMPTION */
   loseWaterAt: number;
@@ -101,10 +111,10 @@ export type DifficultyConfig = {
  */
 export const DIFFICULTY: DifficultyConfig = {
   missionDays: 10,
-  // Near original 40 — greenhouse-heavy is strong but not free. ASSUMPTION (balance pass).
-  startWater: 39,
-  // Lowered from 30 — skipping the maker on plain nights bites. ASSUMPTION (balance pass).
-  startOxygen: 22,
+  // Tight enough that skip-cleaner and delayed leaks matter. ASSUMPTION (Stage 1).
+  startWater: 40,
+  // Plain nights without the air maker must hurt (5 nights × 3 use). ASSUMPTION (Stage 1).
+  startOxygen: 18,
   startMaterials: 10,
   startBattery: 0,
   batteryCap: 20,
@@ -148,16 +158,22 @@ export const DIFFICULTY: DifficultyConfig = {
   panelMaterialCost: 3,
   panelPowerBonus: 1,
 
-  // Mild bump from 15 — two Class-C storms + outdoor science ≈ win; any M/X usually loses. ASSUMPTION (balance pass).
+  // Sev-3 unsheltered = 48, near loseExposureAt. ASSUMPTION (Stage 1).
   stormExposurePerSeverity: 16,
-  // Raised from 0.15 — shelter without shields barely helps. ASSUMPTION (balance pass).
-  shelterExposureFactor: 0.95,
+  // Shelter keeps ~30% of storm exposure (cuts ≥50% vs staying out). ASSUMPTION (Stage 1).
+  shelterExposureFactor: 0.3,
+  // Outdoor science risk per day. ASSUMPTION (Stage 1).
   normalOutsideExposure: 2,
+  // Unshielded habitat creep — makes pure shelter-only fail rough weeks. ASSUMPTION (Stage 1).
+  unshieldedDailyExposure: 3,
+
+  cleanFilterMaterialCost: 1, // ASSUMPTION
+  cleanFilterPowerCost: 1, // ASSUMPTION
 
   loseWaterAt: 0,
   loseOxygenAt: 0,
-  // Lowered from 100 — three storms can fail shelter-only safety. ASSUMPTION (balance pass).
-  loseExposureAt: 60,
+  // Sev-3 out (48) is near-fatal; sev-2 (32) is costly. ASSUMPTION (Stage 1).
+  loseExposureAt: 55,
 };
 
 /** Named aliases so existing engine modules keep reading the same symbols. */
@@ -197,6 +213,9 @@ export const PANEL_POWER_BONUS = DIFFICULTY.panelPowerBonus;
 export const STORM_EXPOSURE_PER_SEVERITY = DIFFICULTY.stormExposurePerSeverity;
 export const SHELTER_EXPOSURE_FACTOR = DIFFICULTY.shelterExposureFactor;
 export const NORMAL_OUTSIDE_EXPOSURE = DIFFICULTY.normalOutsideExposure;
+export const UNSHIELDED_DAILY_EXPOSURE = DIFFICULTY.unshieldedDailyExposure;
+export const CLEAN_FILTER_MATERIAL_COST = DIFFICULTY.cleanFilterMaterialCost;
+export const CLEAN_FILTER_POWER_COST = DIFFICULTY.cleanFilterPowerCost;
 export const LOSE_WATER_AT = DIFFICULTY.loseWaterAt;
 export const LOSE_OXYGEN_AT = DIFFICULTY.loseOxygenAt;
 export const LOSE_EXPOSURE_AT = DIFFICULTY.loseExposureAt;

@@ -1,10 +1,11 @@
 /**
- * Seeded event schedule (SPEC Section 5 / Prompt 3 + 3b).
- * Storm lands after DONKI warning time; greenhouse + radiation cards use OSDR.
+ * Seeded event schedule (SPEC Section 5 / Stage 1).
+ * Two real DONKI storms on days 4|5 and 8|9; no fake quiet Continue/Continue cards.
  */
 
 import { MISSION_DAYS } from "../engine/constants";
 import { createRng, rngInt } from "../engine/rng";
+import { archivedSpaceWeather } from "../data/donki";
 import type { SpaceWeatherResult } from "../data/donkiTypes";
 import type { OsdrStudy } from "../data/osdrTypes";
 import {
@@ -15,7 +16,7 @@ import type { Event } from "../types";
 import { STATIC_EVENTS } from "./events";
 import { buildGreenhouseEvent } from "./greenhouse";
 import { buildRadiationMattersCard } from "./radiation";
-import { buildStormEvent } from "./storm";
+import { buildStormEventAtDay } from "./storm";
 
 export type DaySchedule = {
   day: number;
@@ -24,9 +25,31 @@ export type DaySchedule = {
   afterStormCard?: Event;
 };
 
+export type ScheduledStorm = {
+  day: number;
+  /** Full CME warning days (Comms ON). */
+  warningDays: number;
+  warningHours: number;
+  event: Event;
+  weather: SpaceWeatherResult;
+};
+
+export type StormAlert = {
+  stormDay: number;
+  daysUntil: number;
+  warningDays: number;
+  message: string;
+  donkiFlareId?: string;
+  eventDate?: string | null;
+};
+
 export type MissionSchedule = {
   days: DaySchedule[];
+  /** First storm day (compat). */
   stormDay: number;
+  stormDays: number[];
+  storms: ScheduledStorm[];
+  /** First storm full warning days. */
   warningDays: number;
   seed: number;
   greenhouseStudy: OsdrStudy;
@@ -46,21 +69,55 @@ function shuffleInPlace<T>(items: T[], rng: () => number): T[] {
 export type ScheduleOptions = {
   seed: number;
   weather: SpaceWeatherResult;
-  commsOn: boolean;
+  /** Ignored for storm placement; alerts use daily Comms at runtime. */
+  commsOn?: boolean;
   missionDays?: number;
-  /** Live or archived greenhouse candidates; defaults to archive. */
   greenhouseStudies?: OsdrStudy[];
-  /** Live or archived radiation candidates; defaults to archive radiation role. */
   radiationStudies?: OsdrStudy[];
 };
 
 /**
- * Build a mission calendar. Greenhouse study is seeded so replays differ.
+ * Pick two distinct archived (or live+archived) DONKI records for the two storms.
+ */
+function pickStormWeather(
+  seed: number,
+  live: SpaceWeatherResult,
+): [SpaceWeatherResult, SpaceWeatherResult] {
+  const rng = createRng(seed ^ 0xc0ffee);
+  // Storm 1: smaller C or M. Storm 2: M or X. Keeps win-rate band reachable.
+  const storm1 =
+    rng() < 0.55 ? archivedSpaceWeather("C") : archivedSpaceWeather("M");
+  const storm2 =
+    rng() < 0.5 ? archivedSpaceWeather("M") : archivedSpaceWeather("X");
+  // If both landed on the same M record, bump storm2 to X for distinct IDs.
+  let a = storm1;
+  let b = storm2;
+  if (a.strongestFlare?.flrID === b.strongestFlare?.flrID) {
+    b = archivedSpaceWeather("X");
+  }
+
+  // Prefer LIVE for storm 1 when NASA returned a real flare.
+  if (live.source === "LIVE" && live.strongestFlare) {
+    const liveId = live.strongestFlare.flrID;
+    a = live;
+    if (liveId === b.strongestFlare?.flrID) {
+      b = archivedSpaceWeather("C");
+      if (liveId === b.strongestFlare?.flrID) {
+        b = archivedSpaceWeather("M");
+      }
+    }
+  }
+
+  return [a, b];
+}
+
+/**
+ * Build a mission calendar with storms on day 4|5 and 8|9.
  */
 export function scheduleMissionEvents(
   seedOrOptions: number | ScheduleOptions,
   weatherArg?: SpaceWeatherResult,
-  commsOnArg?: boolean,
+  _commsOnArg?: boolean,
   missionDaysArg = MISSION_DAYS,
 ): MissionSchedule {
   const options: ScheduleOptions =
@@ -68,20 +125,40 @@ export function scheduleMissionEvents(
       ? {
           seed: seedOrOptions,
           weather: weatherArg!,
-          commsOn: Boolean(commsOnArg),
           missionDays: missionDaysArg,
         }
       : seedOrOptions;
 
-  const {
-    seed,
-    weather,
-    commsOn,
-    missionDays = MISSION_DAYS,
-  } = options;
-
+  const { seed, weather, missionDays = MISSION_DAYS } = options;
   const rng = createRng(seed);
-  const built = buildStormEvent(weather, commsOn, missionDays);
+
+  const stormDay1 = rng() < 0.5 ? 4 : 5;
+  const stormDay2 = rng() < 0.5 ? 8 : 9;
+  const [wx1, wx2] = pickStormWeather(seed, weather);
+
+  const built1 = buildStormEventAtDay(wx1, stormDay1, missionDays);
+  const built2 = buildStormEventAtDay(wx2, stormDay2, missionDays);
+
+  // Unique event ids so logs can tell storms apart.
+  built1.event = { ...built1.event, id: "solar-storm-1" };
+  built2.event = { ...built2.event, id: "solar-storm-2" };
+
+  const storms: ScheduledStorm[] = [
+    {
+      day: built1.stormDay,
+      warningDays: built1.warningDays,
+      warningHours: built1.warningHours,
+      event: built1.event,
+      weather: wx1,
+    },
+    {
+      day: built2.stormDay,
+      warningDays: built2.warningDays,
+      warningHours: built2.warningHours,
+      event: built2.event,
+      weather: wx2,
+    },
+  ];
 
   const greenhousePool =
     options.greenhouseStudies ??
@@ -101,27 +178,28 @@ export function scheduleMissionEvents(
     seed ^ 0x85ebca6b,
   );
 
+  const stormDaySet = new Set(storms.map((s) => s.day));
   const byDay = new Map<number, DaySchedule>();
-  byDay.set(built.stormDay, {
-    day: built.stormDay,
-    event: built.event,
-    afterStormCard: buildRadiationMattersCard(radiationStudy),
-  });
+  for (const s of storms) {
+    byDay.set(s.day, {
+      day: s.day,
+      event: s.event,
+      afterStormCard: buildRadiationMattersCard(radiationStudy),
+    });
+  }
 
   const freeDays: number[] = [];
   for (let d = 1; d <= missionDays; d++) {
-    if (d !== built.stormDay) freeDays.push(d);
+    if (!stormDaySet.has(d)) freeDays.push(d);
   }
   shuffleInPlace(freeDays, rng);
 
-  // Replace static greenhouse stub with OSDR-backed card; keep other static events.
   const pool = shuffleInPlace(
     STATIC_EVENTS.filter((e) => e.id !== "greenhouse-experiment"),
     rng,
   );
   const greenhouseEvent = buildGreenhouseEvent(greenhouseStudy);
 
-  // Place greenhouse on the first free day after shuffle for visibility.
   if (freeDays.length > 0) {
     const gDay = freeDays.shift()!;
     byDay.set(gDay, { day: gDay, event: greenhouseEvent });
@@ -129,12 +207,17 @@ export function scheduleMissionEvents(
 
   let poolIndex = 0;
   for (const day of freeDays) {
-    if (poolIndex < pool.length) {
-      byDay.set(day, { day, event: pool[poolIndex]! });
-      poolIndex += 1;
-    } else {
-      byDay.set(day, { day, event: quietDay(day) });
-    }
+    // Cycle the real event pool — never emit Quiet day Continue/Continue.
+    const event = pool[poolIndex % pool.length]!;
+    poolIndex += 1;
+    byDay.set(day, {
+      day,
+      event: {
+        ...event,
+        // Unique id per day so delayed costs / logs stay clear when pool cycles.
+        id: `${event.id}-d${day}`,
+      },
+    });
   }
 
   const days: DaySchedule[] = [];
@@ -144,37 +227,45 @@ export function scheduleMissionEvents(
 
   return {
     days,
-    stormDay: built.stormDay,
-    warningDays: built.warningDays,
+    stormDay: storms[0]!.day,
+    stormDays: storms.map((s) => s.day),
+    storms,
+    warningDays: storms[0]!.warningDays,
     seed,
     greenhouseStudy,
     radiationStudy,
   };
 }
 
-function quietDay(day: number): Event {
-  return {
-    id: `quiet-${day}`,
-    title: "Quiet day",
-    sourceBadge: "STORY",
-    explanation: "No special event today. Keep running the base.",
-    optionA: {
-      id: "continue",
-      label: "Continue",
-      benefit: "Stay on your plan",
-      cost: "No change from this card",
-      effects: {},
-    },
-    optionB: {
-      id: "continue-b",
-      label: "Continue",
-      benefit: "Stay on your plan",
-      cost: "No change from this card",
-      effects: {},
-    },
-    realWorldNote:
-      "Some days on the Moon can be calm; this quiet card is a game filler.",
-  };
+/**
+ * Storm-coming alerts for today.
+ * Comms ON: show if stormDay - day <= warningDays.
+ * Comms OFF: show only if <= floor(warningDays / 2).
+ */
+export function stormAlertsForDay(
+  schedule: MissionSchedule,
+  day: number,
+  commsOn: boolean,
+): StormAlert[] {
+  const alerts: StormAlert[] = [];
+  for (const storm of schedule.storms) {
+    const daysUntil = storm.day - day;
+    if (daysUntil <= 0) continue;
+    const threshold = commsOn
+      ? storm.warningDays
+      : Math.floor(storm.warningDays / 2);
+    if (daysUntil > threshold) continue;
+    const n = daysUntil;
+    alerts.push({
+      stormDay: storm.day,
+      daysUntil: n,
+      warningDays: storm.warningDays,
+      message: `Storm coming in ${n} day${n === 1 ? "" : "s"}.`,
+      donkiFlareId: storm.event.donkiFlareId,
+      eventDate: storm.event.eventDate,
+    });
+  }
+  return alerts;
 }
 
 export function eventForDay(

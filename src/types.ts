@@ -50,7 +50,20 @@ export type GameState = {
   science: number; // score
   /** 1 = full recycler; 0.5 = dust-clogged (SPEC Section 5). */
   recyclerEfficiency: number;
+  /** Costs that land on a later day (trade-offs with delayed pain). */
+  pending: PendingCost[];
   log: DayLog[]; // every decision, for the replay screen
+};
+
+/** A cost scheduled to hit on `applyOnDay` (at least 2 days after the choice). */
+export type PendingCost = {
+  applyOnDay: number;
+  water?: number;
+  oxygen?: number;
+  materials?: number;
+  exposure?: number;
+  battery?: number;
+  note: string;
 };
 
 /** Engine deltas applied when a player picks an event option. */
@@ -73,6 +86,16 @@ export type EventEffects = {
    */
   riskChance?: number;
   riskMaterials?: number;
+  /** Cost that lands `afterDays` later (must be ≥ 2). */
+  delayed?: {
+    afterDays: number;
+    water?: number;
+    oxygen?: number;
+    materials?: number;
+    exposure?: number;
+    battery?: number;
+    note: string;
+  };
 };
 
 export type EventOption = {

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { archivedSpaceWeather } from "../data/donki";
 import { warningFromCmeSpeed } from "../data/warning";
 import { MISSION_DAYS } from "../engine/constants";
-import { STATIC_EVENTS } from "./events";
+import { STATIC_EVENTS, optionsAreIdentical } from "./events";
 import { GLOSSARY } from "./glossary";
-import { scheduleMissionEvents } from "./schedule";
-import { buildStormEvent } from "./storm";
+import { scheduleMissionEvents, stormAlertsForDay } from "./schedule";
+import { buildStormEvent, buildStormEventAtDay } from "./storm";
 
 describe("glossary", () => {
   it("keeps every Space Word definition ≤15 words", () => {
@@ -21,16 +21,10 @@ describe("glossary", () => {
 });
 
 describe("static events (Section 5)", () => {
-  it("includes every non-storm table event with benefit, cost, and effects", () => {
-    const ids = [
-      "lunar-dust",
-      "delayed-message",
-      "supply-drop",
-      "greenhouse-experiment",
-      "battery-surge",
-    ];
-    expect(STATIC_EVENTS.map((e) => e.id).sort()).toEqual(ids.sort());
+  it("every non-storm event has distinct options with benefit and cost", () => {
+    expect(STATIC_EVENTS.length).toBeGreaterThanOrEqual(7);
     for (const event of STATIC_EVENTS) {
+      expect(optionsAreIdentical(event), event.id).toBe(false);
       expect(event.explanation.length).toBeGreaterThan(10);
       expect(event.optionA.benefit.trim()).not.toBe("");
       expect(event.optionA.cost.trim()).not.toBe("");
@@ -53,7 +47,7 @@ describe("storm from DONKI", () => {
     expect(built.event.realWorldNote).toContain("2024-05-03T02:11:00-FLR-001");
   });
 
-  it("places the storm after warning time", () => {
+  it("places legacy storm after warning time", () => {
     const weather = archivedSpaceWeather("X");
     const speed = weather.fastestCme?.mostAccurateSpeedKmS ?? 841;
     const withComms = warningFromCmeSpeed(speed, true);
@@ -64,32 +58,57 @@ describe("storm from DONKI", () => {
     );
 
     const noComms = buildStormEvent(weather, false);
-    expect(noComms.warningDays).toBe(warningFromCmeSpeed(speed, false).warningDays);
+    expect(noComms.warningDays).toBe(
+      warningFromCmeSpeed(speed, false).warningDays,
+    );
     expect(noComms.stormDay).toBeLessThanOrEqual(built.stormDay);
+  });
+
+  it("buildStormEventAtDay keeps DONKI ids on a fixed day", () => {
+    const weather = archivedSpaceWeather("M");
+    const built = buildStormEventAtDay(weather, 5);
+    expect(built.stormDay).toBe(5);
+    expect(built.event.donkiFlareId).toBeTruthy();
+    expect(built.event.eventDate).toBeTruthy();
   });
 });
 
 describe("seeded schedule", () => {
-  it("is deterministic for the same seed and puts storm on warning day", () => {
+  it("is deterministic and puts storms on day 4|5 and 8|9", () => {
     const weather = archivedSpaceWeather("M");
     const a = scheduleMissionEvents(42, weather, true);
     const b = scheduleMissionEvents(42, weather, true);
     expect(a.days.map((d) => d.event.id)).toEqual(
       b.days.map((d) => d.event.id),
     );
-    expect(a.stormDay).toBe(a.warningDays + 1 > 10 ? 10 : a.warningDays + 1);
-    expect(a.days.find((d) => d.day === a.stormDay)?.event.id).toBe(
-      "solar-storm",
-    );
+    expect(a.stormDays).toHaveLength(2);
+    expect([4, 5]).toContain(a.stormDays[0]);
+    expect([8, 9]).toContain(a.stormDays[1]);
     expect(a.days).toHaveLength(10);
+    for (const slot of a.days) {
+      expect(slot.event.optionA.label).not.toBe(slot.event.optionB.label);
+    }
   });
 
   it("changes order when the seed changes", () => {
     const weather = archivedSpaceWeather("C");
     const a = scheduleMissionEvents(1, weather, true);
     const b = scheduleMissionEvents(99, weather, true);
-    const idsA = a.days.filter((d) => d.event.id !== "solar-storm").map((d) => d.event.id);
-    const idsB = b.days.filter((d) => d.event.id !== "solar-storm").map((d) => d.event.id);
+    const idsA = a.days.map((d) => d.event.id);
+    const idsB = b.days.map((d) => d.event.id);
     expect(idsA).not.toEqual(idsB);
+  });
+
+  it("comms ON shows longer storm alerts than OFF", () => {
+    const weather = archivedSpaceWeather("X");
+    const sched = scheduleMissionEvents(7, weather);
+    const storm = sched.storms[0]!;
+    const day = Math.max(1, storm.day - storm.warningDays);
+    const on = stormAlertsForDay(sched, day, true);
+    const off = stormAlertsForDay(sched, day, false);
+    expect(on.length).toBeGreaterThanOrEqual(off.length);
+    if (storm.warningDays >= 2) {
+      expect(on.some((a) => a.stormDay === storm.day)).toBe(true);
+    }
   });
 });

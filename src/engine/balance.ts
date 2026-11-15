@@ -1,12 +1,14 @@
 /**
- * Fixed-strategy balance runner (SPEC 6b / Prompt 1b).
+ * Fixed-strategy balance runner (SPEC 6b / Stage 1).
+ * Uses real scheduleMissionEvents + archived DONKI storms (not 2 random storms).
  * 500 seeds × 5 strategies; win = survive all mission days.
  */
 
+import { archivedSpaceWeather } from "../data/donki";
+import { scheduleMissionEvents } from "../content/schedule";
 import { applyDay } from "./applyDay";
 import { MISSION_DAYS } from "./constants";
 import { createGame } from "./createGame";
-import { rngInt } from "./rng";
 import type { DayDecisions, StormEvent } from "./types";
 import type { SiteId } from "../types";
 
@@ -33,120 +35,82 @@ export type BalanceRow = {
   winRate: number;
 };
 
-function quietEvent(day: number): StormEvent {
-  return {
-    id: `quiet-${day}`,
-    title: "Quiet day",
-    sourceBadge: "STORY",
-    explanation: "A calm day on the Moon.",
-    optionA: {
-      id: "ok",
-      label: "Continue",
-      benefit: "Stay on plan",
-      cost: "No change",
-      effects: {},
-    },
-    optionB: {
-      id: "ok-b",
-      label: "Continue",
-      benefit: "Stay on plan",
-      cost: "No change",
-      effects: {},
-    },
-    realWorldNote: "Some days are quiet.",
-  };
-}
-
-function stormEvent(day: number, severity: 1 | 2 | 3): StormEvent {
-  return {
-    id: `storm-${day}`,
-    title: "Solar storm",
-    sourceBadge: "ARCHIVED",
-    explanation: "A storm from the Sun is here.",
-    stormSeverity: severity,
-    optionA: {
-      id: "shelter",
-      label: "Shelter",
-      benefit: "Lower exposure",
-      cost: "No science today",
-      effects: { sheltered: true },
-    },
-    optionB: {
-      id: "stay-out",
-      label: "Stay out",
-      benefit: "Keep science",
-      cost: "Higher exposure",
-      effects: { sheltered: false },
-    },
-    realWorldNote: "NASA watches the Sun for storms.",
-  };
-}
-
 type StrategyFn = (
   day: number,
   isStorm: boolean,
   rng: () => number,
   materials: number,
   shieldLevel: number,
+  recyclerEfficiency: number,
+  site: SiteId,
 ) => { decisions: DayDecisions; choice: "A" | "B" };
 
 const strategies: Record<StrategyId, StrategyFn> = {
-  all_science: (day, isStorm, _rng, materials) => ({
+  // Stays out in storms; light shields only — big weeks fail, mild weeks can win.
+  all_science: (day, isStorm, _rng, materials, shieldLevel, eff) => ({
     decisions: {
-      // Keep recycler on — risk is exposure from staying out, not an auto water fail.
       recycler: true,
       oxygenMaker: true,
       comms: false,
       scienceLevel: 4,
       greenhouse: false,
-      buildShield: false,
-      buildPanel: materials >= 3 && day <= 2,
+      buildShield: materials >= 2 && shieldLevel < 2 && day <= 3,
+      buildPanel: false,
+      cleanFilter: eff < 1 && materials >= 1,
     },
     choice: isStorm ? "B" : "A",
   }),
 
-  all_safety: (_day, isStorm, _rng, _materials, _shieldLevel) => ({
+  // Shelters every storm; never builds shields — rough weeks should still fail sometimes.
+  all_safety: (_day, isStorm, _rng, materials, _s, eff) => ({
     decisions: {
       recycler: true,
       oxygenMaker: true,
       comms: true,
       scienceLevel: 0,
       greenhouse: false,
-      // Shelter-only "safety" — no shields. SPEC 6b needs this to lose on rough weeks.
       buildShield: false,
       buildPanel: false,
+      cleanFilter: eff < 1 && materials >= 1,
     },
     choice: isStorm ? "A" : "A",
   }),
 
-  balanced: (day, isStorm, _rng, materials, shieldLevel) => ({
+  // Builds one shield; stays out on the early storm. Plain also risks the late storm.
+  balanced: (day, isStorm, _rng, materials, shieldLevel, eff, site) => ({
     decisions: {
       recycler: true,
       oxygenMaker: true,
       comms: true,
       scienceLevel: 1,
-      greenhouse: day % 4 === 0,
-      buildShield: materials >= 2 && shieldLevel < 2 && day <= 4,
-      buildPanel: materials >= 3 && day === 2,
+      greenhouse: day % 5 === 0,
+      buildShield: materials >= 2 && shieldLevel < 1 && day <= 4,
+      buildPanel: false,
+      cleanFilter: eff < 1 && materials >= 1,
     },
-    choice: isStorm ? (day === 1 ? "B" : "A") : "A",
+    choice: isStorm
+      ? day <= 5 || site === "plain"
+        ? "B"
+        : "A"
+      : "A",
   }),
 
-  greenhouse_heavy: (day, isStorm, _rng, materials, shieldLevel) => ({
+  // Plants every day — strong on rim power, fragile on plain nights + water.
+  greenhouse_heavy: (day, isStorm, _rng, materials, shieldLevel, eff) => ({
     decisions: {
       recycler: true,
-      oxygenMaker: day % 2 === 1,
-      comms: true,
+      oxygenMaker: true,
+      comms: false,
       scienceLevel: 0,
       greenhouse: true,
       buildShield: materials >= 2 && shieldLevel < 1 && day <= 2,
       buildPanel: false,
+      cleanFilter: eff < 1 && materials >= 1,
     },
-    // Plants first — sometimes stays out to "check the greenhouse" during storms.
-    choice: isStorm ? (day % 3 === 0 ? "B" : "A") : "A",
+    choice: isStorm ? (day >= 8 ? "B" : "A") : "A",
   }),
 
-  random: (_day, isStorm, rng, materials, shieldLevel) => ({
+  random: (_day, isStorm, rng, materials, shieldLevel, eff) => ({
     decisions: {
       recycler: rng() < 0.75,
       oxygenMaker: rng() < 0.8,
@@ -155,43 +119,44 @@ const strategies: Record<StrategyId, StrategyFn> = {
       greenhouse: rng() < 0.3,
       buildShield: materials >= 2 && shieldLevel < 4 && rng() < 0.45,
       buildPanel: materials >= 3 && rng() < 0.2,
+      cleanFilter: eff < 1 && materials >= 1 && rng() < 0.8,
     },
-    // Bias slightly toward shelter so random is not an auto-loss.
-    choice: isStorm ? (rng() < 0.65 ? "A" : "B") : "A",
+    choice: isStorm ? (rng() < 0.65 ? "A" : "B") : rng() < 0.5 ? "A" : "B",
   }),
 };
 
-/** Play one full mission for a strategy/site/seed. */
+/** Play one full mission for a strategy/site/seed using the real schedule. */
 export function playStrategy(
   strategy: StrategyId,
   site: SiteId,
   seed: number,
 ): { won: boolean; lost: boolean; science: number; dayReached: number } {
   const { state: start, rng } = createGame(site, seed);
-  // Exactly 2 storms (seeded). Severity mix creates win/loss variance (SPEC 6b).
-  const stormDays = new Map<number, 1 | 2 | 3>();
-  while (stormDays.size < 2) {
-    stormDays.set(rngInt(rng, 1, 10), rngInt(rng, 1, 3) as 1 | 2 | 3);
-  }
+  const weather = archivedSpaceWeather("X");
+  const schedule = scheduleMissionEvents({
+    seed,
+    weather,
+    greenhouseStudies: undefined,
+  });
 
   let state = start;
   const decide = strategies[strategy];
 
   for (let step = 0; step < MISSION_DAYS; step++) {
     const day = state.day;
-    const severity = stormDays.get(day);
-    const isStorm = severity !== undefined;
-    const event = isStorm
-      ? stormEvent(day, severity)
-      : quietEvent(day);
+    const slot = schedule.days.find((d) => d.day === day);
+    const event = (slot?.event ?? schedule.days[0]!.event) as StormEvent;
+    const isStorm = event.stormSeverity !== undefined;
     const { decisions, choice } = decide(
       day,
       isStorm,
       rng,
       state.materials,
       state.shieldLevel,
+      state.recyclerEfficiency ?? 1,
+      site,
     );
-    const result = applyDay(state, decisions, event, choice);
+    const result = applyDay(state, decisions, event, choice, rng);
     state = result.state;
     if (result.lost) {
       return {
@@ -228,7 +193,6 @@ export function runBalance(
     for (const strategy of STRATEGY_IDS) {
       let wins = 0;
       for (let s = 0; s < seeds; s++) {
-        // Distinct seed space per site/strategy so streams don't collide oddly
         const seed = s + site.charCodeAt(0) * 10_000 + strategy.length * 1_000;
         if (playStrategy(strategy, site, seed).won) wins += 1;
       }
@@ -262,7 +226,6 @@ export function formatWinRateTable(rows: BalanceRow[]): string {
   return [header, ...lines].join("\n");
 }
 
-/** Best strategy by win rate for a site (ties → first in STRATEGY_IDS order). */
 export function bestStrategyForSite(
   rows: BalanceRow[],
   site: SiteId,

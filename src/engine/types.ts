@@ -13,6 +13,11 @@ export type DayDecisions = {
   buildShield?: boolean;
   /** Spend materials for +1 permanent panel this day. */
   buildPanel?: boolean;
+  /**
+   * Clean clogged water filter when recyclerEfficiency < 1.
+   * Costs 1 material + 1 power from the day's pool / battery.
+   */
+  cleanFilter?: boolean;
 };
 
 export type ApplyDayResult = {

@@ -11,9 +11,10 @@ import { eventImageFor } from "./images";
 
 export type BuiltStorm = {
   event: StormEvent & Event;
+  /** Full warning days from CME speed (comms ON). */
   warningDays: number;
   warningHours: number;
-  /** Day index (1..missionDays) when the storm should land. */
+  /** Day index (1..missionDays) when the storm lands. */
   stormDay: number;
 };
 
@@ -24,32 +25,29 @@ function kidStormSize(severity: 1 | 2 | 3): string {
 }
 
 /**
- * @param weather LIVE or ARCHIVED DONKI summary (must include a flare).
- * @param commsOn Full warning if true; halved if false (SPEC 4.1).
- * @param missionDays Default 10.
+ * Build a storm card for a fixed mission day (Stage 1: days 4/5 and 8/9).
+ * Warning days always use full CME travel time (comms ON); UI halves when Comms is OFF.
  */
-export function buildStormEvent(
+export function buildStormEventAtDay(
   weather: SpaceWeatherResult,
-  commsOn: boolean,
+  stormDay: number,
   missionDays = 10,
 ): BuiltStorm {
   const flare = weather.strongestFlare;
   if (!flare) {
-    throw new Error("buildStormEvent requires a DONKI flare record");
+    throw new Error("buildStormEventAtDay requires a DONKI flare record");
   }
 
   const severityResult = severityFromFlareClass(flare.classType);
   const severity = (severityResult.severity ?? 1) as 1 | 2 | 3;
   const speed = weather.fastestCme?.mostAccurateSpeedKmS ?? 0;
-  const warning = warningFromCmeSpeed(speed > 0 ? speed : 500, commsOn);
-  // Land after warning time: day 1 + warningDays, clamped into the mission.
-  // warningDays 0 → can land on day 1; always at least day 1.
-  const stormDay = Math.min(
-    missionDays,
-    Math.max(1, 1 + warning.warningDays),
-  );
+  const warning = warningFromCmeSpeed(speed > 0 ? speed : 500, true);
+  const day = Math.min(missionDays, Math.max(1, stormDay));
 
-  const date = weather.eventDate ?? flare.peakTime?.slice(0, 10) ?? flare.beginTime.slice(0, 10);
+  const date =
+    weather.eventDate ??
+    flare.peakTime?.slice(0, 10) ??
+    flare.beginTime.slice(0, 10);
   const size = kidStormSize(severity);
 
   const event: StormEvent & Event = {
@@ -64,7 +62,7 @@ export function buildStormEvent(
     optionA: {
       id: "shelter",
       label: "Shelter",
-      benefit: "Exposure stays much lower",
+      benefit: "Crew risk stays much lower",
       cost: "No science that day",
       effects: { sheltered: true, scienceThatDay: 0 },
     },
@@ -72,7 +70,7 @@ export function buildStormEvent(
       id: "stay-out",
       label: "Stay out",
       benefit: "Keep today's science",
-      cost: "Exposure rises a lot",
+      cost: "Crew risk rises a lot",
       effects: { sheltered: false },
     },
     image: eventImageFor("storm"),
@@ -81,6 +79,37 @@ export function buildStormEvent(
 
   return {
     event,
+    warningDays: warning.warningDays,
+    warningHours: warning.hours,
+    stormDay: day,
+  };
+}
+
+/**
+ * @param weather LIVE or ARCHIVED DONKI summary (must include a flare).
+ * @param commsOn Full warning if true; halved if false (SPEC 4.1).
+ * @param missionDays Default 10.
+ * @deprecated Prefer buildStormEventAtDay for fixed storm days; kept for tests.
+ */
+export function buildStormEvent(
+  weather: SpaceWeatherResult,
+  commsOn: boolean,
+  missionDays = 10,
+): BuiltStorm {
+  const flare = weather.strongestFlare;
+  if (!flare) {
+    throw new Error("buildStormEvent requires a DONKI flare record");
+  }
+  const speed = weather.fastestCme?.mostAccurateSpeedKmS ?? 0;
+  const warning = warningFromCmeSpeed(speed > 0 ? speed : 500, commsOn);
+  const stormDay = Math.min(
+    missionDays,
+    Math.max(1, 1 + warning.warningDays),
+  );
+  const built = buildStormEventAtDay(weather, stormDay, missionDays);
+  // Preserve legacy warningDays that respect commsOn for older callers/tests.
+  return {
+    ...built,
     warningDays: warning.warningDays,
     warningHours: warning.hours,
     stormDay,

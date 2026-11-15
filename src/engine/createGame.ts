@@ -21,6 +21,7 @@ export function createGame(site: SiteId, seed: number): CreateGameResult {
     exposure: 0,
     science: 0,
     recyclerEfficiency: 1,
+    pending: [],
     log: [],
   };
 

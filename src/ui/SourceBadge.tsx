@@ -1,10 +1,11 @@
 import type { SourceBadge as Badge } from "../types";
 
+/** On-screen labels. ASSUMPTION shows as "Game rule"; legend still says ASSUMPTION. */
 const LABELS: Record<Badge, string> = {
   LIVE: "LIVE",
   ARCHIVED: "ARCHIVED",
   REFERENCE: "REFERENCE",
-  ASSUMPTION: "ASSUMPTION",
+  ASSUMPTION: "Game rule",
   STORY: "STORY",
   OSDR: "OSDR",
 };

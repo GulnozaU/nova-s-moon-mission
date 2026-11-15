@@ -1,5 +1,7 @@
 import {
   BATTERY_CAP,
+  CLEAN_FILTER_MATERIAL_COST,
+  CLEAN_FILTER_POWER_COST,
   COMMS_COST,
   GREENHOUSE_COST,
   GREENHOUSE_OXYGEN,
@@ -23,13 +25,14 @@ import {
   SHIELD_LEVEL_MAX,
   SHIELD_MATERIAL_COST,
   UNPOWERED_HEAT_EXPOSURE,
+  UNSHIELDED_DAILY_EXPOSURE,
   WATER_USE_WITHOUT_RECYCLER,
   WATER_USE_WITH_RECYCLER,
 } from "./constants";
 import { normalOutsideExposure, stormExposureDelta } from "./exposure";
 import { availablePower, baseGeneration } from "./power";
 import type { ApplyDayResult, DayDecisions, StormEvent } from "./types";
-import type { DayLog, EventEffects, GameState } from "../types";
+import type { DayLog, EventEffects, GameState, PendingCost } from "../types";
 
 function clampScienceLevel(level: number): number {
   if (!Number.isFinite(level) || level < 0) return 0;
@@ -77,6 +80,32 @@ function isLost(state: GameState): boolean {
   );
 }
 
+function applyPendingDue(
+  state: GameState,
+  day: number,
+  notes: string[],
+): GameState {
+  const due = state.pending.filter((p) => p.applyOnDay === day);
+  const remaining = state.pending.filter((p) => p.applyOnDay !== day);
+  if (due.length === 0) return { ...state, pending: remaining };
+
+  let next = { ...state, pending: remaining };
+  for (const cost of due) {
+    if (cost.water) next.water += cost.water;
+    if (cost.oxygen) next.oxygen += cost.oxygen;
+    if (cost.materials) next.materials += cost.materials;
+    if (cost.exposure) next.exposure += cost.exposure;
+    if (cost.battery) {
+      next.battery = Math.min(
+        BATTERY_CAP,
+        Math.max(0, next.battery + cost.battery),
+      );
+    }
+    notes.push(cost.note);
+  }
+  return next;
+}
+
 /**
  * Resolve one mission day. Pure: no UI, no network.
  * Heat is forced. Unspent power returns to the battery (cap 20).
@@ -94,20 +123,26 @@ export function applyDay(
   const option = choice === "A" ? event.optionA : event.optionB;
   const sheltered = Boolean(option.effects.sheltered);
 
-  let battery = state.battery;
-  const generation =
-    baseGeneration(state.site, state.day) + state.panelBonus;
-  let pool = availablePower(
-    state.site,
+  // Delayed costs from earlier choices land at the start of this day.
+  let working = applyPendingDue(
+    { ...state, pending: [...(state.pending ?? [])] },
     state.day,
-    state.panelBonus,
-    state.battery,
+    notes,
   );
-  // Battery is emptied into the day's pool; leftovers are re-stored later.
+
+  let battery = working.battery;
+  const generation =
+    baseGeneration(working.site, working.day) + working.panelBonus;
+  let pool = availablePower(
+    working.site,
+    working.day,
+    working.panelBonus,
+    working.battery,
+  );
   battery = 0;
 
   notes.push(
-    `Day ${state.day}: ${generation} generated + prior battery → ${pool} chips`,
+    `Day ${working.day}: ${generation} generated + prior battery → ${pool} chips`,
   );
 
   // --- Forced heat ---
@@ -119,7 +154,26 @@ export function applyDay(
     notes.push("Heat unpowered — crew safety suffers.");
   }
 
-  // --- Optional systems (skip if not enough chips left) ---
+  // --- Clean filter (before other optional systems) ---
+  let recyclerEfficiency = working.recyclerEfficiency ?? 1;
+  let materials = working.materials;
+  if (
+    decisions.cleanFilter &&
+    recyclerEfficiency < 1 &&
+    materials >= CLEAN_FILTER_MATERIAL_COST &&
+    pool >= CLEAN_FILTER_POWER_COST
+  ) {
+    materials -= CLEAN_FILTER_MATERIAL_COST;
+    pool -= CLEAN_FILTER_POWER_COST;
+    recyclerEfficiency = 1;
+    notes.push(
+      `Cleaned the water filter (−${CLEAN_FILTER_MATERIAL_COST} material, −${CLEAN_FILTER_POWER_COST} power).`,
+    );
+  } else if (decisions.cleanFilter && recyclerEfficiency < 1) {
+    notes.push("Could not clean the filter (need 1 material and 1 power).");
+  }
+
+  // --- Optional systems ---
   let recyclerOn = false;
   let oxygenMakerOn = false;
   let commsOn = false;
@@ -130,14 +184,14 @@ export function applyDay(
     pool -= RECYCLER_COST;
     recyclerOn = true;
   } else if (decisions.recycler) {
-    notes.push("Recycler skipped — not enough power.");
+    notes.push("Water cleaner skipped — not enough power.");
   }
 
   if (decisions.oxygenMaker && pool >= OXYGEN_MAKER_COST) {
     pool -= OXYGEN_MAKER_COST;
     oxygenMakerOn = true;
   } else if (decisions.oxygenMaker) {
-    notes.push("Oxygen maker skipped — not enough power.");
+    notes.push("Air maker skipped — not enough power.");
   }
 
   if (decisions.comms && pool >= COMMS_COST) {
@@ -166,22 +220,16 @@ export function applyDay(
     notes.push("Greenhouse skipped — not enough power.");
   }
 
-  // Unspent chips → battery (cap 20)
   battery = Math.min(BATTERY_CAP, pool);
   if (pool > BATTERY_CAP) {
     notes.push(`Battery full — discarded ${pool - BATTERY_CAP} chips.`);
   }
 
-  // --- Materials builds ---
-  let materials = state.materials;
-  let shieldLevel = state.shieldLevel;
-  let panelBonus = state.panelBonus;
+  let shieldLevel = working.shieldLevel;
+  let panelBonus = working.panelBonus;
 
   if (decisions.buildShield) {
-    if (
-      materials >= SHIELD_MATERIAL_COST &&
-      shieldLevel < SHIELD_LEVEL_MAX
-    ) {
+    if (materials >= SHIELD_MATERIAL_COST && shieldLevel < SHIELD_LEVEL_MAX) {
       materials -= SHIELD_MATERIAL_COST;
       shieldLevel += 1;
       notes.push(`Built shield level ${shieldLevel}.`);
@@ -200,29 +248,44 @@ export function applyDay(
     }
   }
 
-  // --- Water / oxygen ---
-  let water = state.water;
-  let oxygen = state.oxygen;
+  let water = working.water;
+  let oxygen = working.oxygen;
 
-  const efficiency = state.recyclerEfficiency ?? 1;
   const waterUse = recyclerOn
     ? WATER_USE_WITHOUT_RECYCLER -
-      (WATER_USE_WITHOUT_RECYCLER - WATER_USE_WITH_RECYCLER) * efficiency
+      (WATER_USE_WITHOUT_RECYCLER - WATER_USE_WITH_RECYCLER) *
+        recyclerEfficiency
     : WATER_USE_WITHOUT_RECYCLER;
   water -= waterUse;
+  if (recyclerOn) {
+    notes.push(
+      recyclerEfficiency < 1
+        ? `Water −${waterUse}: cleaner on but clogged (half strength).`
+        : `Water −${waterUse}: the water cleaner was on.`,
+    );
+  } else {
+    notes.push(`Water −${waterUse}: the water cleaner was off.`);
+  }
+
   if (oxygenMakerOn) {
     water -= OXYGEN_MAKER_WATER;
     oxygen += OXYGEN_MAKER_GAIN;
+    notes.push(
+      `Water −${OXYGEN_MAKER_WATER}, oxygen +${OXYGEN_MAKER_GAIN}: air maker was on.`,
+    );
   }
   if (greenhouseOn) {
     water -= GREENHOUSE_WATER;
     oxygen += GREENHOUSE_OXYGEN;
+    notes.push(
+      `Water −${GREENHOUSE_WATER}, oxygen +${GREENHOUSE_OXYGEN}: greenhouse was on.`,
+    );
   }
   oxygen -= OXYGEN_USE_PER_DAY;
+  notes.push(`Oxygen −${OXYGEN_USE_PER_DAY}: the crew breathed.`);
 
-  // --- Science points ---
   const pointsPerLevel =
-    state.site === "rim" ? SCIENCE_POINTS_RIM : SCIENCE_POINTS_PLAIN;
+    working.site === "rim" ? SCIENCE_POINTS_RIM : SCIENCE_POINTS_PLAIN;
   let scienceGain = sheltered ? 0 : scienceLevelsRun * pointsPerLevel;
   if (sheltered && scienceLevelsRun > 0) {
     notes.push("Sheltered — science that day is 0.");
@@ -230,33 +293,47 @@ export function applyDay(
   if (greenhouseOn && !sheltered) {
     scienceGain += GREENHOUSE_SCIENCE;
   } else if (greenhouseOn && sheltered) {
-    // Shelter zeroes science that day (SPEC 3.7), including greenhouse bonus.
     notes.push("Sheltered — greenhouse science cancelled.");
   }
 
-  let science = state.science + scienceGain;
-  let exposure = state.exposure;
+  let science = working.science + scienceGain;
+  if (scienceGain > 0) {
+    notes.push(`Science +${scienceGain}: work outside or plants.`);
+  }
+  let exposure = working.exposure;
 
   if (!heatPowered) {
     exposure += UNPOWERED_HEAT_EXPOSURE;
+    notes.push(
+      `Crew risk +${UNPOWERED_HEAT_EXPOSURE}: heat had no power.`,
+    );
   }
 
-  // --- Storm / normal outdoor exposure ---
+  // Unshielded habitat — small daily risk until shields are built.
+  if (shieldLevel <= 0 && UNSHIELDED_DAILY_EXPOSURE > 0) {
+    exposure += UNSHIELDED_DAILY_EXPOSURE;
+    notes.push(
+      `Crew risk +${UNSHIELDED_DAILY_EXPOSURE}: no storm shields on the base yet.`,
+    );
+  }
+
   const severity = event.stormSeverity;
   if (severity !== undefined) {
     const delta = stormExposureDelta(severity, shieldLevel, sheltered);
     exposure += delta;
     notes.push(
-      `Storm severity ${severity}: +${delta.toFixed(2)} exposure (${sheltered ? "sheltered" : "outside"}).`,
+      sheltered
+        ? `Crew risk +${delta.toFixed(1)}: storm hit while sheltered.`
+        : `Crew risk +${delta.toFixed(1)}: storm hit while outside.`,
     );
   } else if (scienceLevelsRun > 0 && !sheltered) {
     const delta = normalOutsideExposure();
     exposure += delta;
-    notes.push(`Outside for science: +${delta} exposure.`);
+    notes.push(`Crew risk +${delta}: crew worked outside.`);
   }
 
   let next: GameState = {
-    ...state,
+    ...working,
     battery,
     water,
     oxygen,
@@ -265,6 +342,7 @@ export function applyDay(
     panelBonus,
     exposure,
     science,
+    recyclerEfficiency,
   };
 
   let effects = { ...option.effects };
@@ -280,29 +358,47 @@ export function applyDay(
       materials: (effects.materials ?? 0) + riskMaterials,
     };
     notes.push(
-      `Mistake risk hit — lost ${Math.abs(riskMaterials)} materials.`,
+      `Materials ${riskMaterials}: a rushed choice went wrong.`,
     );
   }
   const applied = applyEffects(next, effects);
   next = applied.state;
   if (applied.scienceThatDayOverride !== undefined) {
-    // effects.scienceThatDay replaces today's science gain if provided
-    const withoutToday = state.science;
+    const withoutToday = working.science;
     next = {
       ...next,
       science: withoutToday + applied.scienceThatDayOverride,
     };
   }
 
-  // Re-clamp battery after event effects
+  // Queue delayed costs (≥ 2 days later).
+  const delayed = option.effects.delayed;
+  let pending: PendingCost[] = [...(next.pending ?? [])];
+  if (delayed && delayed.afterDays >= 2) {
+    const entry: PendingCost = {
+      applyOnDay: working.day + delayed.afterDays,
+      note: delayed.note,
+    };
+    if (delayed.water !== undefined) entry.water = delayed.water;
+    if (delayed.oxygen !== undefined) entry.oxygen = delayed.oxygen;
+    if (delayed.materials !== undefined) entry.materials = delayed.materials;
+    if (delayed.exposure !== undefined) entry.exposure = delayed.exposure;
+    if (delayed.battery !== undefined) entry.battery = delayed.battery;
+    pending = [...pending, entry];
+    notes.push(
+      `Later cost set for day ${entry.applyOnDay}: ${delayed.note}`,
+    );
+  }
+  next = { ...next, pending };
+
   next.battery = Math.min(BATTERY_CAP, Math.max(0, next.battery));
 
   const lost = isLost(next);
-  const finishedMission = state.day >= MISSION_DAYS && !lost;
-  const nextDay = lost || finishedMission ? state.day : state.day + 1;
+  const finishedMission = working.day >= MISSION_DAYS && !lost;
+  const nextDay = lost || finishedMission ? working.day : working.day + 1;
 
   const dayLog: DayLog = {
-    day: state.day,
+    day: working.day,
     powerSpent: {
       heat: heatPowered ? HEAT_COST : 0,
       recycler: recyclerOn,
@@ -328,7 +424,7 @@ export function applyDay(
   const newState: GameState = {
     ...next,
     day: nextDay,
-    log: [...state.log, dayLog],
+    log: [...working.log, dayLog],
   };
 
   return {

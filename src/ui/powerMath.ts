@@ -1,4 +1,5 @@
 import {
+  CLEAN_FILTER_POWER_COST,
   COMMS_COST,
   GREENHOUSE_COST,
   HEAT_COST,
@@ -11,6 +12,7 @@ import type { DayDecisions } from "../engine/types";
 /** Power chips spent by current tap plan (heat is always included). */
 export function plannedPowerCost(d: DayDecisions): number {
   let cost = HEAT_COST;
+  if (d.cleanFilter) cost += CLEAN_FILTER_POWER_COST;
   if (d.recycler) cost += RECYCLER_COST;
   if (d.oxygenMaker) cost += OXYGEN_MAKER_COST;
   if (d.comms) cost += COMMS_COST;
@@ -29,5 +31,6 @@ export function defaultDecisions(): DayDecisions {
     greenhouse: false,
     buildShield: false,
     buildPanel: false,
+    cleanFilter: false,
   };
 }

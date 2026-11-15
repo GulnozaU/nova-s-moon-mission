@@ -15,6 +15,7 @@ describe("types smoke", () => {
       exposure: 0,
       science: 0,
       recyclerEfficiency: 1,
+      pending: [],
       log: [],
     };
     expect(state.day).toBe(1);

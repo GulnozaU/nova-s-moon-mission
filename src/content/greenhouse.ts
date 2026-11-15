@@ -33,9 +33,15 @@ export function buildGreenhouseEvent(study: OsdrStudy): Event {
     optionB: {
       id: "save-water",
       label: "Save the water",
-      benefit: "Tanks stay fuller",
-      cost: "No plant oxygen or science bonus today",
-      effects: {},
+      benefit: "Tanks stay fuller today",
+      cost: "No plant bonus now; in 2 days plants wilt (−1 oxygen)",
+      effects: {
+        delayed: {
+          afterDays: 2,
+          oxygen: -1,
+          note: "Skipped watering — plants made less air later.",
+        },
+      },
     },
     image: eventImageFor("greenhouse"),
     realWorldNote: `${study.finding} See ${study.url}. ${ISS_MOON_CAUTION}`,

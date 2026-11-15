@@ -5,6 +5,7 @@ import {
   DIFFICULTY,
   SHIELD_REDUCTION_PER_LEVEL,
   STORM_EXPOSURE_PER_SEVERITY,
+  UNSHIELDED_DAILY_EXPOSURE,
 } from "./constants";
 import { createGame } from "./createGame";
 import { stormExposureDelta } from "./exposure";
@@ -178,15 +179,21 @@ describe("engine Section 3", () => {
     low = runDays(low, 2, baseDecisions());
 
     const storm = stormEvent(2);
+    const lowBefore = low.exposure;
+    const highBefore = high.exposure;
     const lowHit = applyDay(low, baseDecisions(), storm, "B");
     const highHit = applyDay(high, baseDecisions(), storm, "B");
 
-    const expectedLow = stormExposureDelta(2, 0, false);
-    const expectedHigh = stormExposureDelta(2, 2, false);
-    expect(lowHit.state.exposure).toBeCloseTo(expectedLow, 5);
-    expect(highHit.state.exposure).toBeCloseTo(expectedHigh, 5);
-    expect(highHit.state.exposure).toBeCloseTo(
-      lowHit.state.exposure * (1 - 2 * SHIELD_REDUCTION_PER_LEVEL),
+    // Storm delta only (unshielded daily may also apply when shieldLevel is 0).
+    const expectedLowStorm = stormExposureDelta(2, 0, false);
+    const expectedHighStorm = stormExposureDelta(2, 2, false);
+    expect(lowHit.state.exposure - lowBefore).toBeCloseTo(
+      expectedLowStorm + UNSHIELDED_DAILY_EXPOSURE,
+      5,
+    );
+    expect(highHit.state.exposure - highBefore).toBeCloseTo(expectedHighStorm, 5);
+    expect(expectedHighStorm).toBeCloseTo(
+      expectedLowStorm * (1 - 2 * SHIELD_REDUCTION_PER_LEVEL),
       5,
     );
   });

@@ -82,18 +82,41 @@ function newSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
+function whyFromNotes(
+  notes: string[],
+  needle: RegExp,
+  fallback: string,
+): string {
+  const hit = notes.find((n) => needle.test(n));
+  return hit ?? fallback;
+}
+
 function buildDeltas(
   before: GameState,
   result: ApplyDayResult,
 ): ResourceDelta[] {
   const after = result.state;
+  const notes = result.dayLog.notes;
+  const dWater = after.water - before.water;
+  const dOxygen = after.oxygen - before.oxygen;
+  const dBattery = after.battery - before.battery;
+  const dMaterials = after.materials - before.materials;
+  const dExposure = after.exposure - before.exposure;
+  const dScience = after.science - before.science;
+
   const rows: ResourceDelta[] = [
     {
       key: "water",
       label: "Water",
       before: before.water,
       after: after.water,
-      why: "Drank, cleaned, or watered plants",
+      why: whyFromNotes(
+        notes,
+        /Water/i,
+        dWater < 0
+          ? `Water ${dWater}: tanks went down today.`
+          : `Water +${dWater}: tanks went up today.`,
+      ),
       badge: "ASSUMPTION",
     },
     {
@@ -101,7 +124,13 @@ function buildDeltas(
       label: "Oxygen",
       before: before.oxygen,
       after: after.oxygen,
-      why: "Crew breath and air maker",
+      why: whyFromNotes(
+        notes,
+        /Oxygen|air maker|breathed|crack|leak/i,
+        dOxygen < 0
+          ? `Oxygen ${dOxygen}: air went down.`
+          : `Oxygen +${dOxygen}: air went up.`,
+      ),
       badge: "ASSUMPTION",
     },
     {
@@ -109,7 +138,13 @@ function buildDeltas(
       label: "Battery",
       before: before.battery,
       after: after.battery,
-      why: "Leftover power chips stored",
+      why: whyFromNotes(
+        notes,
+        /Battery|power|panel|filter/i,
+        dBattery < 0
+          ? `Battery ${dBattery}: power chips were spent.`
+          : `Battery +${dBattery}: leftover chips stored.`,
+      ),
       badge: "ASSUMPTION",
     },
     {
@@ -117,7 +152,13 @@ function buildDeltas(
       label: "Materials",
       before: before.materials,
       after: after.materials,
-      why: "Builds or event costs",
+      why: whyFromNotes(
+        notes,
+        /material|shield|panel|filter|parts/i,
+        dMaterials < 0
+          ? `Materials ${dMaterials}: parts were used.`
+          : `Materials +${dMaterials}: parts gained.`,
+      ),
       badge: "ASSUMPTION",
     },
     {
@@ -125,7 +166,13 @@ function buildDeltas(
       label: "Crew safety risk",
       before: before.exposure,
       after: after.exposure,
-      why: "Storm or time outside",
+      why: whyFromNotes(
+        notes,
+        /Crew risk|storm|outside|heat/i,
+        dExposure > 0
+          ? `Crew risk +${dExposure.toFixed(1)}: storm or time outside.`
+          : `Crew risk ${dExposure.toFixed(1)}: rest helped a little.`,
+      ),
       badge: "ASSUMPTION",
     },
     {
@@ -133,7 +180,13 @@ function buildDeltas(
       label: "Science",
       before: before.science,
       after: after.science,
-      why: "Work outside or greenhouse",
+      why: whyFromNotes(
+        notes,
+        /Science|Sheltered/i,
+        dScience > 0
+          ? `Science +${dScience}: work outside or plants.`
+          : "Science unchanged: sheltered or no work outside.",
+      ),
       badge: "ASSUMPTION",
     },
   ];
@@ -192,7 +245,6 @@ export function useGameSession(): GameSession {
       const sched = scheduleMissionEvents({
         seed: nextSeed,
         weather: wx,
-        commsOn: true,
         greenhouseStudies: [study],
       });
       const dayEvent =

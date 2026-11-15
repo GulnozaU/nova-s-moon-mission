@@ -1,13 +1,23 @@
 export { STATIC_EVENTS, STATIC_EVENT_IDS, getStaticEvent } from "./events";
 export { GLOSSARY, getGlossaryTerm } from "./glossary";
 export type { GlossaryEntry } from "./glossary";
-export { buildStormEvent } from "./storm";
+export { buildStormEvent, buildStormEventAtDay } from "./storm";
 export type { BuiltStorm } from "./storm";
 export {
   scheduleMissionEvents,
   eventForDay,
+  stormAlertsForDay,
 } from "./schedule";
-export type { DaySchedule, MissionSchedule } from "./schedule";
+export type {
+  DaySchedule,
+  MissionSchedule,
+  ScheduledStorm,
+  StormAlert,
+} from "./schedule";
+export {
+  optionsAreIdentical,
+  optionDominates,
+} from "./events";
 export {
   buildGreenhouseEvent,
   ISS_MOON_CAUTION,
