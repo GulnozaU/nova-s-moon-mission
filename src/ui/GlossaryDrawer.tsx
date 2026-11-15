@@ -21,11 +21,15 @@ export function GlossaryDrawer({ open, onClose }: Props) {
             Close
           </button>
         </header>
+        <p className="muted">Tap a word in the game anytime to see it again.</p>
         <ul>
           {GLOSSARY.map((g) => (
             <li key={g.id}>
-              <strong>{g.term}</strong>
-              <p>{g.definition}</p>
+              <img src={g.pictureSrc} alt="" className="drawer-pic" />
+              <div>
+                <strong>{g.term}</strong>
+                <p>{g.definition}</p>
+              </div>
             </li>
           ))}
         </ul>

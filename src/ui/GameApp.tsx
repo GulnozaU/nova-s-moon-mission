@@ -7,6 +7,9 @@ import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { getNasaImage } from "../content/images";
 import { useGameSession } from "./useGameSession";
+import { DialogueBox } from "./teach/DialogueBox";
+import { EndReport } from "./teach/EndReport";
+import { SpaceText } from "./teach/SpaceText";
 import "./game.css";
 
 const TRAINING = [
@@ -14,16 +17,31 @@ const TRAINING = [
     title: "Power is limited",
     body: "You get a few power chips each day. Heat always needs some.",
     art: ART.panels,
+    lines: [
+      { text: "Hello! I am Nova." },
+      { text: "Power is limited each day." },
+      { text: "Heat always needs some chips." },
+    ],
   },
   {
-    title: "Every choice has a trade-off",
-    body: "One button helps. The other costs. Read both before you tap.",
-    art: ART.iconShield,
+    title: "Water and air run out",
+    body: "Turn on the water cleaner and air maker, or tanks drop fast.",
+    art: ART.waterTower,
+    lines: [
+      { text: "Water and air can run out." },
+      { text: "The water cleaner saves water." },
+      { text: "The air maker needs power too." },
+    ],
   },
   {
-    title: "Storms are real",
+    title: "Space weather can hurt",
     body: "NASA watches the Sun. A storm day can hurt if you stay outside.",
     art: ART.iconSun,
+    lines: [
+      { text: "Space weather can hurt the crew." },
+      { text: "NASA watches storms on the Sun." },
+      { text: "Shelter helps when storms arrive." },
+    ],
   },
 ];
 
@@ -64,19 +82,20 @@ export function GameApp() {
                 alt="Nova the young astronaut"
                 className="welcome-hero__nova bounce"
               />
-              <img src={ART.rover} alt="" className="actor actor--rover drive" style={{ position: "absolute" }} />
               <CardNasaImage slot="title" className="welcome-hero__nasa" />
             </div>
             <div className="welcome-copy">
               <p className="eyebrow">Real data from NASA</p>
-              <h1>Help Nova run a Moon base for 10 days</h1>
-              <p>
-                Watch the base move. Spend power. Then pick a choice where both the
-                help and the cost are written out loud.
-              </p>
+              <h1>Can you help Nova for 10 days?</h1>
+              <DialogueBox
+                lines={[
+                  { text: "Hello! I am Nova." },
+                  { text: "Can you help me run this Moon base?" },
+                ]}
+              />
               <div className="panel__actions">
                 <button type="button" className="btn primary pulse" onClick={g.startTraining}>
-                  Start training
+                  Start training day
                 </button>
                 <button type="button" className="btn ghost" onClick={g.openLegend}>
                   Badge legend
@@ -89,7 +108,7 @@ export function GameApp() {
         {g.phase === "training" ? (
           <section className="screen training-screen panel">
             <p className="eyebrow">
-              Training {g.trainingStep + 1} / {TRAINING.length}
+              Training Day · {g.trainingStep + 1} / {TRAINING.length} · nothing scored
             </p>
             <img
               src={TRAINING[g.trainingStep]!.art}
@@ -97,7 +116,13 @@ export function GameApp() {
               className="training-art bob"
             />
             <h2>{TRAINING[g.trainingStep]!.title}</h2>
-            <p>{TRAINING[g.trainingStep]!.body}</p>
+            <p>
+              <SpaceText
+                text={TRAINING[g.trainingStep]!.body}
+                onOpenDrawer={() => g.setGlossaryOpen(true)}
+              />
+            </p>
+            <DialogueBox key={g.trainingStep} lines={TRAINING[g.trainingStep]!.lines} />
             <div className="panel__actions">
               {g.trainingStep > 0 ? (
                 <button
@@ -116,7 +141,7 @@ export function GameApp() {
                   else g.setTrainingStep(g.trainingStep + 1);
                 }}
               >
-                {g.trainingStep >= TRAINING.length - 1 ? "Pick a site" : "Next"}
+                {g.trainingStep >= TRAINING.length - 1 ? "Pick a site" : "Next idea"}
               </button>
             </div>
           </section>
@@ -125,7 +150,12 @@ export function GameApp() {
         {g.phase === "site" ? (
           <section className="screen site-screen">
             <h2>Where should Nova build?</h2>
-            <p>Each place has a written trade-off. Pick one.</p>
+            <p>
+              <SpaceText
+                text="Each place has a trade-off. Read both sides."
+                onOpenDrawer={() => g.setGlossaryOpen(true)}
+              />
+            </p>
             <div className="site-grid">
               {g.siteRecords.map((site) => {
                 const slot = site.imageSlot as "southPole" | "equatorial";
@@ -139,7 +169,11 @@ export function GameApp() {
                   >
                     <CardNasaImage slot={slot} />
                     <h3>{site.name}</h3>
-                    <p>{site.illumination.summary}</p>
+                    <p>
+                      {site.id === "rim"
+                        ? "Sunny almost every day"
+                        : "Dark for half the time"}
+                    </p>
                     <p className="site-card__trade">
                       {site.id === "rim" ? (
                         <>
@@ -153,8 +187,15 @@ export function GameApp() {
                         </>
                       )}
                     </p>
+                    <details className="how-know">
+                      <summary>How do we know?</summary>
+                      <p>
+                        Picture {nasa.id}. Sunlight rule is a game ASSUMPTION for this
+                        short mission.
+                      </p>
+                    </details>
                     <SourceBadge badge="ASSUMPTION" />
-                    <span className="btn primary">Build here · {nasa.id}</span>
+                    <span className="btn primary">Build here</span>
                   </button>
                 );
               })}
@@ -211,43 +252,20 @@ export function GameApp() {
           <DayResultView
             result={g.lastResult}
             deltas={g.deltas}
+            event={g.todaysEvent}
             notes={g.lastResult.dayLog.notes}
             onContinue={g.continueAfterResult}
+            onOpenGlossary={() => g.setGlossaryOpen(true)}
           />
         ) : null}
 
         {g.phase === "end" && g.state ? (
-          <section className="screen panel end-screen">
-            <img
-              src={g.lastResult?.won ? ART.novaGirlHelmet : ART.novaGirlGlasses}
-              alt=""
-              className="end-art bounce"
-            />
-            <h2>{g.lastResult?.won ? "Mission complete!" : "Mission stopped"}</h2>
-            <p>
-              Science score: <strong>{g.state.science}</strong>{" "}
-              <SourceBadge badge="ASSUMPTION" />
-            </p>
-            <p>
-              Crew safety risk: <strong>{g.state.exposure.toFixed(1)}</strong>{" "}
-              <SourceBadge badge="ASSUMPTION" />
-            </p>
-            <ul className="end-log">
-              {g.state.log.map((day) => (
-                <li key={day.day}>
-                  Day {day.day}: {day.eventId} → {day.choice} · science {day.science}
-                </li>
-              ))}
-            </ul>
-            <div className="panel__actions">
-              <button type="button" className="btn primary" onClick={g.replay}>
-                Replay with a new seed
-              </button>
-              <button type="button" className="btn ghost" onClick={g.openLegend}>
-                What is real?
-              </button>
-            </div>
-          </section>
+          <EndReport
+            state={g.state}
+            result={g.lastResult}
+            onReplay={g.replay}
+            onLegend={g.openLegend}
+          />
         ) : null}
 
         {g.phase === "legend" ? <LegendScreen onBack={g.backFromLegend} /> : null}
@@ -276,16 +294,21 @@ export function GameApp() {
               </button>
             </header>
             <p>
-              Study {g.schedule.radiationStudy.id}:{" "}
-              {g.schedule.radiationStudy.finding}
+              <SpaceText
+                text={`Scientists grew plants for study ${g.schedule.radiationStudy.id}. ${g.schedule.radiationStudy.finding}`}
+                onOpenDrawer={() => g.setGlossaryOpen(true)}
+              />
             </p>
-            <a
-              href={g.schedule.radiationStudy.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open study
-            </a>
+            <details className="how-know">
+              <summary>How do we know?</summary>
+              <a
+                href={g.schedule.radiationStudy.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open study {g.schedule.radiationStudy.id}
+              </a>
+            </details>
           </aside>
         </div>
       ) : null}

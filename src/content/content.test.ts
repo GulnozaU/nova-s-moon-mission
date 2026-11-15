@@ -8,13 +8,14 @@ import { scheduleMissionEvents } from "./schedule";
 import { buildStormEvent } from "./storm";
 
 describe("glossary", () => {
-  it("defines radiation, solar flare, CME, battery, sol in ≤15 words", () => {
-    const ids = ["radiation", "solar-flare", "cme", "battery", "sol"];
-    for (const id of ids) {
-      const entry = GLOSSARY.find((g) => g.id === id);
-      expect(entry, id).toBeDefined();
-      const words = entry!.definition.trim().split(/\s+/);
-      expect(words.length, id).toBeLessThanOrEqual(15);
+  it("keeps every Space Word definition ≤15 words", () => {
+    for (const entry of GLOSSARY) {
+      const words = entry.definition.trim().split(/\s+/);
+      expect(words.length, entry.id).toBeLessThanOrEqual(15);
+    }
+    const needed = ["radiation", "solar-flare", "storm-cloud", "battery", "sol"];
+    for (const id of needed) {
+      expect(GLOSSARY.find((g) => g.id === id), id).toBeDefined();
     }
   });
 });

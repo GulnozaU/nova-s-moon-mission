@@ -1,25 +1,45 @@
 import type { ApplyDayResult } from "../engine/types";
+import type { Event } from "../types";
 import type { ResourceDelta } from "./useGameSession";
+import { plainTalk } from "../content/banned";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
+import { ReadAloudButton } from "./teach/ReadAloudButton";
+import { SpaceText } from "./teach/SpaceText";
 
 type Props = {
   result: ApplyDayResult;
   deltas: ResourceDelta[];
+  event: Event | null;
   notes: string[];
   onContinue: () => void;
+  onOpenGlossary: () => void;
 };
 
-export function DayResultView({ result, deltas, notes, onContinue }: Props) {
+export function DayResultView({
+  result,
+  deltas,
+  event,
+  notes,
+  onContinue,
+  onOpenGlossary,
+}: Props) {
+  const really = event ? plainTalk(event.realWorldNote) : "Your choices stacked for later days.";
+  const summary = deltas
+    .map((d) => `${d.label} ${d.before} to ${d.after}`)
+    .join(". ");
+
   return (
     <section className="panel day-result">
       <header className="panel__head">
         <img src={ART.iconCalendar} alt="" className="bob" />
         <div>
-          <h2>Day {result.dayLog.day} result</h2>
-          <p>Here is what changed and why.</p>
+          <h2>5. Day {result.dayLog.day} result</h2>
+          <p>Arrows show what changed and why.</p>
         </div>
       </header>
+
+      <ReadAloudButton text={`${summary}. ${really}`} />
 
       <ul className="delta-list">
         {deltas.length === 0 ? (
@@ -27,11 +47,10 @@ export function DayResultView({ result, deltas, notes, onContinue }: Props) {
         ) : (
           deltas.map((d) => {
             const up = d.after > d.before;
-            const arrow = up ? "↑" : "↓";
             return (
               <li key={d.key}>
                 <span className={up ? "delta up" : "delta down"}>
-                  {arrow} {d.label}
+                  {up ? "↑" : "↓"} {d.label}
                 </span>
                 <strong>
                   {fmt(d.before)} → {fmt(d.after)}
@@ -45,12 +64,19 @@ export function DayResultView({ result, deltas, notes, onContinue }: Props) {
         )}
       </ul>
 
+      <div className="teach-block really-box">
+        <h3>6. What really happens</h3>
+        <p>
+          <SpaceText text={really} onOpenDrawer={onOpenGlossary} />
+        </p>
+      </div>
+
       {notes.length > 0 ? (
-        <details className="day-result__notes">
+        <details className="how-know">
           <summary>How do we know?</summary>
           <ul>
             {notes.map((n) => (
-              <li key={n}>{n}</li>
+              <li key={n}>{plainTalk(n)}</li>
             ))}
           </ul>
         </details>

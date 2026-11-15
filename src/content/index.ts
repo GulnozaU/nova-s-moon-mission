@@ -22,3 +22,7 @@ export {
   nasaImageReferenceLines,
 } from "./images";
 export type { ImageSlot, NasaImage, CardImageProps } from "./images";
+export { GLOSSARY_OVER_15, glossaryMatchTerms } from "./glossary";
+export { plainTalk, BANNED_TERMS } from "./banned";
+export { rankFromState } from "./rank";
+export { causeEffectFromLog, quizFromState } from "./debrief";
