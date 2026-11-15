@@ -25,7 +25,7 @@ time inside the game, not in a side panel. Real site
 illumination sets solar power. Real OSDR space
 biology studies drive the greenhouse events.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 1 of 20
+Page 1 of 22
 
 3. Core design
 Crew of 4 Moonkeepers led by Nova. Mission: 10 days. All amounts are whole numbers so
@@ -56,7 +56,7 @@ Replay with a different seed.
 Presentation 30 second video that shows: live card, a choice, the
 consequence two days later, the end report.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 2 of 20
+Page 2 of 22
 
 3.3 State
 type GameState = {
@@ -89,7 +89,7 @@ Greenhouse 1 (and 2 water) +1 oxygen and +1 science per day, but 2 water
 leaves your tanks. A real OSDR study sets the
 event (Section 4.3)
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 3 of 20
+Page 3 of 22
 
 Lose if water or oxygen reaches 0, or exposure reaches 100.
 3.6 Materials
@@ -122,7 +122,7 @@ science gives only +1.5 per level
 Easy terrain: science +2 per level, but
 you must store power for night
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 4 of 20
+Page 4 of 22
 
 3.9 The trade-off rule: every decision costs something
 The challenge text says a decision with no cost teaches nothing. So the rule for the whole
@@ -199,12 +199,12 @@ Research needs
 energy and time
 outside
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 5 of 20
+Page 5 of 22
 
 4. Real data: how it drives the game
 4.1 DONKI (live, with archived fallback)
-API: https://api.nasa.gov/DONKI/{FLR|CME|SEP|GST}?startDate=YYYY-MM-
-DD&endDate=YYYY-MM-DD&api_key=KEY
+API: https://ccmc.gsfc.nasa.gov (confirm the exact base URL in the DONKI-API
+doc, no key) /DONKI/{FLR|CME|SEP|GST}?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 On load, fetch the last 30 days of flares (FLR) and CMEs.
 Severity from the strongest real flare: class C = 1, M = 2, X = 3. The mapping is a game
 assumption. The flare record is real. Show both.
@@ -258,7 +258,7 @@ on score
 Safety versus
 progress
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 6 of 20
+Page 6 of 22
 
 SEP endpoint is optional. Do not use SEP events as a dose measurement; they are not.
 4.2 Site illumination (archived)
@@ -293,7 +293,7 @@ Honesty rules: state only findings you read on the study page. Experiments on th
 International Space Station may not match the Moon, so say so on the card. Never
 invent a study ID.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 7 of 20
+Page 7 of 22
 
 Anchor the greenhouse to a real lunar study. Study OSD-476 in OSDR grew the plant
 Arabidopsis in real Apollo lunar soil on Earth (confirm on the OSDR study page). The
@@ -311,6 +311,30 @@ Radiation numbers: OSDR animal and plant studies explain why radiation matters, 
 they are not a dose table for a Moon base. Keep the exposure meter labeled
 ASSUMPTION, or base it on a published radiation measurement dataset and cite it.
 4.4 RadLab [CUT unless everything else is done]
+4.5 Real NASA pictures [TONIGHT, 6 to 8 images]
+Henry's Farm used a real crop photo and a real drought map. We do the same with real
+pictures from the NASA Image and Video Library. The picture comes first on a card, then
+one plain line.
+Source: the keyless NASA Image and Video Library ( images-api.nasa.gov , site
+images.nasa.gov ). Search by keyword and media type, then read one item by its
+NASA ID.
+Pick them yourself, then save them. Choose 6 to 8 images, save each one's NASA ID,
+title, credit line and page link in /content/images.json , and bundle the files. A fixed
+list loads fast and cannot break on demo day. Live search is optional.
+Where they go: title screen (Earth from the Moon), the storm card (a real picture of
+the Sun), the site cards (the Moon's south pole and an equatorial area), the dust event
+(Apollo-era lunar dust), and the greenhouse card (plants and lunar soil).
+Credit under every picture, copied from the item's own record, for example "Image:
+NASA/...". Add each one to References.
+Nova's Moon Mission: Spec and Cursor Prompts
+Page 8 of 22
+
+Check the license note on each item. NASA media is generally free to use, but some
+items carry third-party copyright. Skip any item that says so. See NASA's media usage
+guidelines.
+Do not use the NASA logo or insignia, and do not imply that NASA made or endorsed
+the game. Use plain text such as "Real data from NASA".
+Add short alt text to every image describing what it shows.
 5. Events (randomized by seed)
 Each day has one event card with two options, each with a visible benefit and a visible
 cost. Seed decides which day each event lands, except the real-data storm, which must
@@ -333,23 +357,6 @@ Spend 1 material and
 1 power to clean
 Skip: recycler loses
 half efficiency
-Nova's Moon Mission: Spec and Cursor Prompts
-Page 8 of 20
-
-After every choice show a "What really happens" line: one plain sentence of real NASA
-context. Each line must be accurate. If you cannot verify a claim, remove it.
-6. The compounding rule (test this)
-A test must prove: Day 3, player turns the recycler off to fund science. Water falls faster.
-On Day 8 the player cannot run both the oxygen maker and the experiment. If this test
-fails, the game is not working.
-6b. Prove there is no best strategy
-Add an automated balance test. Play 500 seeds with each of five fixed strategies: all
-science, all safety, balanced, greenhouse heavy, and random.
-Every strategy must win on at least 10 percent of seeds and lose on at least 10
-percent. These targets are for tuning, not rules from NASA.
-If one strategy wins on more than 90 percent of seeds, rebalance the numbers.
-The best fixed strategy must differ between the rim site and the plain site.
-Event Source badge Option A Option B
 Delayed message
 from Earth
 REFERENCE (about
@@ -378,17 +385,22 @@ gives +1 oxygen and
 Save the water:
 tanks stay fuller, no
 plant bonus
-Battery surge STORY Use extra power
-now: more science
-today, less in the
-battery for night
-Save to battery:
-nothing gained
-today, a buffer for
-later
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 9 of 20
+Page 9 of 22
 
+After every choice show a "What really happens" line: one plain sentence of real NASA
+context. Each line must be accurate. If you cannot verify a claim, remove it.
+6. The compounding rule (test this)
+A test must prove: Day 3, player turns the recycler off to fund science. Water falls faster.
+On Day 8 the player cannot run both the oxygen maker and the experiment. If this test
+fails, the game is not working.
+6b. Prove there is no best strategy
+Add an automated balance test. Play 500 seeds with each of five fixed strategies: all
+science, all safety, balanced, greenhouse heavy, and random.
+Every strategy must win on at least 10 percent of seeds and lose on at least 10
+percent. These targets are for tuning, not rules from NASA.
+If one strategy wins on more than 90 percent of seeds, rebalance the numbers.
+The best fixed strategy must differ between the rim site and the plain site.
 A player who adapts to each day's storm and supplies must beat every fixed strategy.
 That is the lesson: think, do not repeat.
 6c. Teaching design: assume the player knows nothing
@@ -398,6 +410,18 @@ water and air run out, (3) space weather can hurt the crew. Nothing is scored.
 Explain every word the first time it appears, in 15 words or fewer, with a picture.
 Example: "Radiation: invisible energy from the Sun that can harm the body." Tap any
 underlined word later to see it again in the Space Words drawer.
+Event Source badge Option A Option B
+Battery surge STORY Use extra power
+now: more science
+today, less in the
+battery for night
+Save to battery:
+nothing gained
+today, a buffer for
+later
+Nova's Moon Mission: Spec and Cursor Prompts
+Page 10 of 22
+
 Same card for every decision: (1) What is happening. (2) Why it matters. (3) Your
 options, each with its benefit and cost as icons and numbers. (4) Predict: "What do
 you think happens to your water?" (5) Result with arrows. (6) What really happens:
@@ -420,9 +444,6 @@ One mode for ages 7 to 12. Older kids stay interested because the choices are ha
 and the consequences are real, not because the words are harder.
 Tone: friendly, short and a little funny, like Henry in Henry's Farm Adventures. Nova
 talks to the player like a teammate.
-Nova's Moon Mission: Spec and Cursor Prompts
-Page 10 of 20
-
 A rank at the end: Cadet, Flight Engineer or Mission Commander, from crew safety,
 science and supplies left.
 Real stakes, not punishment: the crew can fail. A failure shows a short "Mission
@@ -433,6 +454,9 @@ consistent illustrated style works. List every asset in References.
 Henry's lines are things like "Hello, I am Henry! A local farmer." and "Can you help me
 figure out what's happening?" That is the level we need. One idea per line, a character
 who speaks, a picture first, and click to continue.
+Nova's Moon Mission: Spec and Cursor Prompts
+Page 11 of 22
+
 Dialogue box: a name tag (Nova, Mission Control), one or two short sentences, at
 most 12 words a line, then "click to continue".
 Picture first, then words: show a real photo or map and say one plain thing about it,
@@ -443,6 +467,8 @@ storm cloud, sunlight, water cleaner, air maker.
 Math the Henry way: a small box with one simple rule and today's numbers filled in,
 such as "Water left = 30 − 4 = 26". No formulas with units a 7 year old has not met.
 The real data stays real, but it is told as a picture and a short line:
+The exact flare class, speed and formula stay in the small "How do we know?" link on each
+card. Nobody needs to click it to play.
 Real NASA data What the child sees
 Flare class (C, M or X) A small, medium or big storm, shown as 1, 2 or 3 sun
 bursts
@@ -453,11 +479,20 @@ OSDR study "Scientists grew plants on a space station. Here is
 what they found:" and one sentence
 Site sunlight A sun and moon bar: "Sunny almost every day" or
 "Dark for half the time"
+Exposure meter A "Crew safety" bar with a heart
+Too hard Say it like this
+"DONKI recorded an M2.1 flare with an
+Earth-directed CME at 900 km/s."
+"NASA saw a medium storm on the Sun. The
+storm cloud will reach us in 2 days. Get
+ready!"
+"Radiation exposure increases cumulative
+dose."
+"Storm energy can hurt people. Stay inside
+to stay safe."
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 11 of 20
+Page 12 of 22
 
-The exact flare class, speed and formula stay in the small "How do we know?" link on each
-card. Nobody needs to click it to play.
 Show the cost the same way: "Costs 2 power. Saves 3 water." with icons.
 Read-aloud test: read each card to a 7 year old. If they ask "what is that?", rewrite the
 card.
@@ -474,33 +509,23 @@ weather" card, event card.
 6. End report: chart of resources by day, your strategy, what you could try differently,
 final score.
 7. Replay: new seed, same engine.
-Real NASA data What the child sees
-Exposure meter A "Crew safety" bar with a heart
+8. "What is real and what is simplified" screen with a badge legend and all sources.
+Add a Training Day screen first and a Space Words drawer (Section 6c). Every unfamiliar
+term is explained the first time it appears.
+8. Tech and structure
+React + TypeScript + Vite (or what you already have). DONKI and OSDR need no
+NASA key. Still call them through a small serverless function (Vercel or Netlify) for
+caching and in case the browser blocks direct calls. Do not use the old DEMO_KEY  key
+route; it is out of date.
 Too hard Say it like this
-"DONKI recorded an M2.1 flare with an
-Earth-directed CME at 900 km/s."
-"NASA saw a medium storm on the Sun. The
-storm cloud will reach us in 2 days. Get
-ready!"
-"Radiation exposure increases cumulative
-dose."
-"Storm energy can hurt people. Stay inside
-to stay safe."
 "The recycler reduces water loss from 4 to 1
 units."
 "The water cleaner saves water, but it uses
 power."
 "Allocate power chips across subsystems." "You have 8 power. Pick what to turn on."
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 12 of 20
+Page 13 of 22
 
-8. "What is real and what is simplified" screen with a badge legend and all sources.
-Add a Training Day screen first and a Space Words drawer (Section 6c). Every unfamiliar
-term is explained the first time it appears.
-8. Tech and structure
-React + TypeScript + Vite (or what you already have). Keep the NASA key out of the
-browser: use a serverless function (Vercel or Netlify) or an env variable. For
-development, DEMO_KEY  works but is rate limited.
 Folders: /engine  (pure functions, no UI), /data  (NASA services, cache, archived
 JSON), /ui , /content  (events and glossary).
 Engine is deterministic given a seed. Write unit tests for the chain in Section 6.
@@ -519,7 +544,7 @@ Create src/types.ts with the GameState and Event types from the spec.
 Summarize back to me the 3 systems and the linking chain in 5 lines to prove 
 you understood.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 13 of 20
+Page 14 of 22
 
 Prompt 1: Simulation engine only [TONIGHT]
 Implement /engine as pure TypeScript with no UI and no network.
@@ -558,14 +583,17 @@ than 10 percent of seeds.
 6) Show me the win-rate table and tell me which constants you changed to 
 balance it.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 14 of 20
+Page 15 of 22
 
 Prompt 2: Data layer [TONIGHT]
 Implement /data.
 1) donki.ts: fetch FLR and CME for the last 30 days through a /api/donki 
 serverless route that
-reads NASA_API_KEY from env. Return the strongest flare and the fastest CME 
-with real dates and IDs.
+needs no key. First open the DONKI-API doc linked from 
+https://ccmc.gsfc.nasa.gov/tools/DONKI and confirm the current base URL 
+(DONKI moved on 30 Sept 2026). Test it with one request and show me the raw 
+result. Return the strongest flare and the fastest CME with real dates and 
+IDs.
 2) severity.ts: flare class C=1, M=2, X=3 (labeled ASSUMPTION mapping).
 3) warning.ts: hours = 149600000 / speedKmS / 3600, warningDays = 
 floor(hours/24), halved without comms.
@@ -591,7 +619,7 @@ Schedule events with the seeded RNG; the storm lands after its warning time.
 Only include claims in realWorldNote that are true; if unsure write a TODO 
 and tell me.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 15 of 20
+Page 16 of 22
 
 Prompt 3b: OSDR data and greenhouse events [TONIGHT archived, LATER 
 live]
@@ -616,6 +644,26 @@ OSDR study.
 5) Pick the study with the seeded random generator so replays differ.
 6) On failure or empty result, use the archive and show an ARCHIVED badge.
 Add tests with mocked fetch for success, empty and failure.
+Nova's Moon Mission: Spec and Cursor Prompts
+Page 17 of 22
+
+Prompt 3c: Real NASA pictures [TONIGHT]
+Add real NASA pictures using Section 4.5.
+1) Write a small script /scripts/find-images.ts that searches the NASA Image 
+and Video Library
+   (images-api.nasa.gov, no key) for these topics and prints the top 5 
+results each with NASA ID, title, credit and page link:
+   Earth from the Moon, solar flare on the Sun, Moon south pole, Apollo lunar 
+dust, plants grown in lunar soil.
+   First confirm the endpoint on NASA's own pages and show me what you found.
+2) I will choose the images. After I give you the IDs, save them in 
+/content/images.json with id, title, credit, page URL and alt text,
+   and download the files into /public/images.
+3) Show each picture on its card with the credit line beneath it.
+4) Skip any item whose record flags third-party copyright.
+5) Do not use the NASA logo or insignia anywhere. Do not suggest NASA 
+endorses the game.
+6) Give me the list of every image with its credit for the References field.
 Prompt 4: UI [TONIGHT]
 Build the screens in Section 7 using the engine and data layer.
 Main base screen is a clean flat illustration (simple SVG or emoji icons are 
@@ -628,7 +676,7 @@ and a day-result screen with arrows showing what changed and why.
 Every number has a source badge. Add the legend screen.
 Responsive for desktop and tablet. No login. Handle loading and errors.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 16 of 20
+Page 18 of 22
 
 Prompt 4b: Learning layer and plain language [TONIGHT]
 Add the teaching layer from Sections 6c, 6d and 6e on top of the existing UI. 
@@ -664,7 +712,7 @@ and a "Try a different strategy" button that starts a new seed.
 Add a "What is real and what is simplified" page listing every dataset, its 
 link, and its badge.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 17 of 20
+Page 19 of 22
 
 Prompt 6: QA and polish [TONIGHT]
 Play the game start to finish at least three ways (power-heavy science, safe 
@@ -694,7 +742,7 @@ The game link works with no login.
 References lists every OSDR study ID used, API and library. Add a short "Use of AI"
 note and a "Limitations" note to the write-up (Section 13).
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 18 of 20
+Page 20 of 22
 
 12. Honesty line for your submission text
 "Solar events and CME speeds come from NASA DONKI. Radiation exposure in the game
@@ -727,7 +775,7 @@ A note on how AI was used A "Use of AI" paragraph (below)
 Demo video, live link and GitHub link 30 second video, a link that works with no
 login, and the code on GitHub
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 19 of 20
+Page 21 of 22
 
 How it works: the daily loop, the three systems, and one example of a Day 3 choice
 that changes Day 8.
@@ -743,4 +791,4 @@ Use of AI: say honestly where you used AI tools to brainstorm, write code or deb
 and that you checked the data and facts yourselves.
 References: every library, font, icon, image, API and study ID.
 Nova's Moon Mission: Spec and Cursor Prompts
-Page 20 of 20
+Page 22 of 22

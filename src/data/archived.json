@@ -1,0 +1,96 @@
+{
+  "source": "ARCHIVED",
+  "fetchedFrom": "https://ccmc.gsfc.nasa.gov/DONKI-API/get/{FLR|CME}",
+  "queryWindow": {
+    "startDate": "2024-05-01",
+    "endDate": "2024-05-14"
+  },
+  "fetchedAt": "2026-11-15",
+  "note": "Three real DONKI flare+CME pairs (C, M, X). IDs and dates are from NASA CCMC DONKI. Never invent records.",
+  "events": [
+    {
+      "flareClassLetter": "C",
+      "flare": {
+        "flrID": "2024-05-01T05:53:00-FLR-001",
+        "classType": "C5.3",
+        "beginTime": "2024-05-01T05:53Z",
+        "peakTime": "2024-05-01T06:57Z",
+        "endTime": "2024-05-01T07:35Z",
+        "sourceLocation": "S15W76",
+        "activeRegionNum": 13657,
+        "linkedEvents": [
+          {
+            "activityID": "2024-05-01T06:36:00-CME-001"
+          }
+        ],
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/FLR/36921/-1"
+      },
+      "cme": {
+        "activityID": "2024-05-01T06:36:00-CME-001",
+        "startTime": "2024-05-01T06:36Z",
+        "sourceLocation": "S20W65",
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/CME/30362/-1",
+        "mostAccurateSpeedKmS": 794.0,
+        "mostAccurateType": "C",
+        "analysisLink": "https://ccmc.gsfc.nasa.gov/DONKI/view/CMEAnalysis/30363/-1",
+        "time21_5": "2024-05-01T11:11Z"
+      }
+    },
+    {
+      "flareClassLetter": "M",
+      "flare": {
+        "flrID": "2024-05-01T22:26:00-FLR-001",
+        "classType": "M1.8",
+        "beginTime": "2024-05-01T22:26Z",
+        "peakTime": "2024-05-01T22:31Z",
+        "endTime": "2024-05-01T22:37Z",
+        "sourceLocation": "N25E22",
+        "activeRegionNum": 13663,
+        "linkedEvents": [
+          {
+            "activityID": "2024-05-01T23:16:00-CME-001"
+          }
+        ],
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/FLR/30378/-1"
+      },
+      "cme": {
+        "activityID": "2024-05-01T23:16:00-CME-001",
+        "startTime": "2024-05-01T23:16Z",
+        "sourceLocation": "N25E22",
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/CME/30384/-1",
+        "mostAccurateSpeedKmS": 353.0,
+        "mostAccurateType": "S",
+        "analysisLink": "https://ccmc.gsfc.nasa.gov/DONKI/view/CMEAnalysis/30385/-1",
+        "time21_5": "2024-05-02T08:51Z"
+      }
+    },
+    {
+      "flareClassLetter": "X",
+      "flare": {
+        "flrID": "2024-05-03T02:11:00-FLR-001",
+        "classType": "X1.6",
+        "beginTime": "2024-05-03T02:11Z",
+        "peakTime": "2024-05-03T02:22Z",
+        "endTime": "2024-05-03T02:27Z",
+        "sourceLocation": "N26E05",
+        "activeRegionNum": 13663,
+        "linkedEvents": [
+          {
+            "activityID": "2024-05-03T02:48:00-CME-001"
+          }
+        ],
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/FLR/30403/-1"
+      },
+      "cme": {
+        "activityID": "2024-05-03T02:48:00-CME-001",
+        "startTime": "2024-05-03T02:48Z",
+        "sourceLocation": "N26E05",
+        "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/CME/30409/-1",
+        "mostAccurateSpeedKmS": 841.0,
+        "mostAccurateType": "C",
+        "analysisLink": "https://ccmc.gsfc.nasa.gov/DONKI/view/CMEAnalysis/30410/-1",
+        "time21_5": "2024-05-03T06:52Z"
+      }
+    }
+  ]
+}

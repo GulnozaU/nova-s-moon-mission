@@ -6,7 +6,9 @@ export type SourceBadge =
   | "ARCHIVED"
   | "REFERENCE"
   | "ASSUMPTION"
-  | "STORY";
+  | "STORY"
+  /** Greenhouse / biology cards tied to an OSDR study (SPEC Section 5). */
+  | "OSDR";
 
 export type SiteId = "rim" | "plain";
 
@@ -46,6 +48,8 @@ export type GameState = {
   panelBonus: number; // extra chips per day from built panels
   exposure: number; // 0..100, never goes down on its own
   science: number; // score
+  /** 1 = full recycler; 0.5 = dust-clogged (SPEC Section 5). */
+  recyclerEfficiency: number;
   log: DayLog[]; // every decision, for the replay screen
 };
 
@@ -59,9 +63,16 @@ export type EventEffects = {
   exposure?: number;
   shieldLevel?: number;
   panelBonus?: number;
+  /** Absolute efficiency to set (e.g. 0.5 after skipping dust clean). */
   recyclerEfficiency?: number;
   scienceThatDay?: number;
   sheltered?: boolean;
+  /**
+   * If set with riskMaterials, seeded resolve may apply that materials loss
+   * (e.g. delayed-message 1-in-4 mistake).
+   */
+  riskChance?: number;
+  riskMaterials?: number;
 };
 
 export type EventOption = {
@@ -85,4 +96,11 @@ export type Event = {
   optionB: EventOption;
   /** One accurate NASA-context sentence; omit unverified claims. */
   realWorldNote: string;
+  /** Present on storm cards built from DONKI (YYYY-MM-DD). */
+  eventDate?: string;
+  /** Flare-derived severity when this is a storm card. */
+  stormSeverity?: 1 | 2 | 3;
+  /** DONKI flare / CME ids when known. */
+  donkiFlareId?: string;
+  donkiCmeId?: string;
 };

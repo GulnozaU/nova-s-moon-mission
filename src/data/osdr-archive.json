@@ -1,0 +1,51 @@
+{
+  "source": "ARCHIVED",
+  "note": "Three real OSDR studies from NASA search. Findings paraphrased from each study description/publication title on the record. Do not invent.",
+  "studies": [
+    {
+      "id": "OSD-476",
+      "title": "Plants grown in Apollo lunar regolith present stress-associated transcriptomes that inform prospects for lunar exploration",
+      "organism": "Arabidopsis thaliana",
+      "mission": "Not listed on record",
+      "flightProgram": "",
+      "description": "The extent to which plants can enhance human life support on other worlds depends on the ability of plants to thrive in extraterrestrial environments using in situ resources. Using samples from Apollo 11, 12 and 17, we show that the terrestrial plant Arabidopsis thaliana germinates and grows in diverse lunar regoliths. However, our results show that growth is challenging; the lunar regolith plants were slow to develop, expressed genes indicative of ionic stresses, and many showed severe stress morphologies. Therefore, although in situ lunar regolith can be useful for plant production in lunar habitats, they are not benign substrates. The interaction between plants and lunar regolith will need to be further elucidated, and likely mitigated, to enable efficient use of lunar regolith for life support.",
+      "publicationTitle": "Plants grown in Apollo lunar regolith present stress-associated transcriptomes that inform prospects for lunar exploration",
+      "finding": "Arabidopsis grew in Apollo lunar soil samples, but growth was hard and the plants showed stress-related gene activity.",
+      "url": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-476",
+      "source": "ARCHIVED",
+      "role": "greenhouse",
+      "fetchedFromSearch": "https://osdr.nasa.gov/osdr/data/search?term=OSD-476",
+      "metaEndpointNote": "osdr.nasa.gov/osdr/data/osd/meta/{numericId} works; /meta/OSD-{id} returns empty study."
+    },
+    {
+      "id": "OSD-37",
+      "title": "Comparison of the spaceflight transcriptome of four commonly used Arabidopsis thaliana ecotypes",
+      "organism": "Arabidopsis thaliana",
+      "mission": "SpaceX-4",
+      "flightProgram": "International Space Station (ISS)",
+      "description": "This experiment compared the spaceflight transcriptomes of four commonly used natural variants (ecotypes) of Arabidopsis thaliana using RNAseq. In nature, Arabidopsis is a native of Europe/Asia/Northwestern Africa and is found across the globe growing in a wide range of environments. The geographical spread of these various populations has led to a slow divergence leading to distinct ecotypes. Understanding the impact of this ecotypic variability is an important factor when using Arabidopsis as a model. Seeds of the ecotypes Col_0, Ler-2, Ws-2 and Cvi-0 were flown to the International Space Station as part of CRS-4 mission in the Biological Research in Canister (BRIC) hardware. The seeds were germinated on orbit, grown for 8 days and then fixed in RNAlater and frozen in the MELFI freezer for return to Earth. Once returned RNA was isolated and RNAseq performed to catalog the transcriptional patterns of the plants grown in space. An identical set of samples were grown in parallel on the ground to provide controls to allow assessment of transcriptional changes specifically associated with the spaceflight environment. This data release includes 48 out of 56 sample expression files with the remaining 8 files to be released at a later date.",
+      "publicationTitle": "Variation in the transcriptome of different ecotypes of Arabidopsis thaliana reveals signatures of oxidative stress in plant responses to spaceflight     Test of Arabidopsis Space Transcriptome: A Discovery Environment to Explore Multiple Plant Biology Spaceflight Experiments",
+      "finding": "Four kinds of Arabidopsis were grown on the ISS during SpaceX-4 so scientists could compare their gene activity in spaceflight.",
+      "url": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-37",
+      "source": "ARCHIVED",
+      "role": "greenhouse",
+      "fetchedFromSearch": "https://osdr.nasa.gov/osdr/data/search?term=OSD-37",
+      "metaEndpointNote": "osdr.nasa.gov/osdr/data/osd/meta/{numericId} works; /meta/OSD-{id} returns empty study."
+    },
+    {
+      "id": "OSD-520",
+      "title": "Changes in DNA Methylation in Arabidopsis thaliana Plants Exposed Over Multiple Generations to Gamma Radiation",
+      "organism": "Arabidopsis thaliana",
+      "mission": "Not listed on record",
+      "flightProgram": "",
+      "description": "Previous studies have found indications that exposure to ionising radiation (IR) results in DNA methylation changes in plants. However, this phenomenon is yet to be studied across multiple generations. Furthermore, the exact role of these changes in the IR-induced plant response is still far from understood. Here, we study the effect of gamma radiation on DNA methylation and its effect across generations in young Arabidopsis plants. A multigenerational set-up was used in which three generations (Parent, generation 1, and generation 2) of 7-day old Arabidopsis thaliana plants were exposed to either of the different radiation treatments (30, 60, 110, or 430 mGy/h) or to natural background radiation (control condition) for 14 days. The parental generation consisted of previously non-exposed plants, whereas generation 1 and generation 2 plants had already received a similar irradiation in the previous one or two generations, respectively. Directly after exposure the entire methylomes were analysed with UPLC-MS/MS to measure whole genome methylation levels. Whole genome bisulfite sequencing was used to identify differentially methylated regions (DMRs), including their methylation context in the three generations and this for three different radiation conditions (control, 30 mGy/h, and 110 mGy/h). Both intra- and intergenerational comparisons of the genes and transposable elements associated with the DMRs were made. Taking the methylation context into account, the highest number of changes were found for cytosines followed directly by guanine (CG methylation), whereas only limited changes in CHG methylation occurred and no changes in CHH methylation were observed. A clear increase in IR-induced DMRs was seen over the three generations that were exposed to the lowest dose rate, where generation 2 had a markedly higher number of DMRs than the previous two generations (Parent and generation 1). Counterintuitively, we did not see significant differences in the plants exposed to the highest dose rate. A large number of DMRs associated with transposable elements were found, the majority of them being hypermethylated, likely leading to more genetic stability. Next to that, a significant number of DMRs were associated with genes (either in their promoter-associated region or gene body). A functional analysis of these genes showed an enrichment for genes related to development as well as various stress responses, including DNA repair, RNA splicing, and (a)biotic stress responses. These observations indicate a role of DNA methylation in the regulation of these genes in response to IR exposure and shows a possible role for epigenetics in plant adaptation to IR over multiple generations.",
+      "publicationTitle": "Changes in DNA Methylation in Arabidopsis thaliana Plants Exposed Over Multiple Generations to Gamma Radiation.",
+      "finding": "Arabidopsis plants exposed to gamma radiation over several generations showed changes in DNA methylation.",
+      "url": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-520",
+      "source": "ARCHIVED",
+      "role": "radiation",
+      "fetchedFromSearch": "https://osdr.nasa.gov/osdr/data/search?term=OSD-520",
+      "metaEndpointNote": "osdr.nasa.gov/osdr/data/osd/meta/{numericId} works; /meta/OSD-{id} returns empty study."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "sites": [
+    {
+      "id": "rim",
+      "name": "South pole ridge (rim)",
+      "illumination": {
+        "summary": "High, near-constant sunlight on a polar ridge",
+        "litFraction": null,
+        "powerChipsPerDay": 8,
+        "badge": "ASSUMPTION",
+        "note": "Polar illumination fraction must be verified against a published NASA/LRO figure before citing as REFERENCE. Chip count is a game ASSUMPTION (SPEC 3.8)."
+      },
+      "sciencePointsPerLevel": 1.5,
+      "sourceUrl": "https://lunar.gsfc.nasa.gov/moonlight.html",
+      "sourceNote": "LRO/Lunar Reconnaissance Orbiter program page — not a verified numeric illumination citation for this ridge yet."
+    },
+    {
+      "id": "plain",
+      "name": "Equatorial mare (plain)",
+      "illumination": {
+        "summary": "About half of the time (lunar day ≈ 29.5 Earth days)",
+        "litFraction": 0.5,
+        "litFractionBadge": "REFERENCE",
+        "powerChipsPerDayLit": 8,
+        "powerChipsPerDayNight": 0,
+        "litDaysInMission": 5,
+        "powerBadge": "ASSUMPTION",
+        "note": "Lunar day ≈ 29.5 Earth days is well-established astronomy context; ~half sunlight at equator follows from that. Exact chip counts and the 5 lit / 5 night mission split are ASSUMPTION."
+      },
+      "sciencePointsPerLevel": 2,
+      "sourceUrl": "https://moon.nasa.gov/moon-in-motion/moon-phases/about-moon-phases/",
+      "sourceNote": "NASA Moon phases / lunar day context for the ~29.5-day synodic month."
+    }
+  ]
+}
