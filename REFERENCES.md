@@ -30,9 +30,20 @@ No NASA API keys are embedded in the client. Live calls go through same-origin `
 
 | Asset | License | Notes |
 |-------|---------|-------|
-| Nova + crew (Sam, Mira, Dr. Ana) | Original (this project) | Built from Three.js primitives (capsules/boxes/spheres). No third-party mesh pack. |
-| Moon surface / interiors | Original (this project) | Low-poly pastel blocks; MeshToonMaterial; no AI-image textures |
+| Nova + crew cutouts | Original (this project) | `public/art/cutouts/*.png` — rembg cutouts from storybook paintings |
+| Depth painting scenes | Original paintings + offline depth | `src/depthScenes/` — displaced plane, no runtime AI |
+| Low-poly toon world (prototype) | Original | `src/world3d/` MeshToonMaterial placeholders |
 | NASA stills | NASA media (see table below) | DOM / teaching UI only — not used as 3D textures |
+
+## Offline depth models (no AI at runtime)
+
+| Model | Used by | License | Output |
+|-------|---------|---------|--------|
+| [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small-hf) (`depth-anything/Depth-Anything-V2-Small-hf`) | `scripts/generate-depth-maps.py --method da-v2` | **Apache-2.0** | `public/art/depth/*-depth.png` |
+| [Intel DPT Hybrid MiDaS](https://huggingface.co/Intel/dpt-hybrid-midas) (optional `--method midas`) | same script | **MIT** (MiDaS / DPT weights per HF card) | same folder |
+| Geometric fallback | `--method geometric` | Original | only if torch unavailable |
+
+Depth PNGs are **committed**; the browser only loads static textures.
 
 ## Sound
 

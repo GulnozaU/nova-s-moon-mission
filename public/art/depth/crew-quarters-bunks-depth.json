@@ -1,0 +1,8 @@
+{
+  "source": "crew-quarters-bunks.jpeg",
+  "width": 1408,
+  "height": 768,
+  "method": "da-v2",
+  "model": "depth-anything/Depth-Anything-V2-Small-hf",
+  "output": "depth/crew-quarters-bunks-depth.png"
+}

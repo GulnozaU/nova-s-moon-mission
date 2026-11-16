@@ -14,6 +14,7 @@ dist-ssr
 
 # Local image tooling / Python venvs (never commit — GitHub 100MB limit)
 .venv-img/
+.venv-depth/
 .venv/
 venv/
 __pycache__/

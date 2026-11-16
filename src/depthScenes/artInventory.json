@@ -1,0 +1,87 @@
+{
+  "backgrounds": [
+    {
+      "id": "surface",
+      "file": "lunar-surface-craters.jpeg",
+      "size": [1408, 768],
+      "role": "Moon surface hub",
+      "bakedIn": [
+        "crater field ground",
+        "distant hills / horizon haze",
+        "sky wash"
+      ],
+      "separateCutoutsAvailable": [
+        "cutouts/habitat-dome.png",
+        "cutouts/greenhouse-dome.png",
+        "cutouts/stone-cottage-base.png",
+        "cutouts/solar-panels.png",
+        "cutouts/satellite-dish-comms.png",
+        "cutouts/lunar-rover.png",
+        "cutouts/earth-from-moon.png",
+        "cutouts/water-tower.png",
+        "cutouts/supply-crates.png"
+      ],
+      "depth": "depth/lunar-surface-craters-depth.png"
+    },
+    {
+      "id": "home",
+      "file": "crew-quarters-bunks.jpeg",
+      "size": [1408, 768],
+      "role": "Crew home interior",
+      "bakedIn": [
+        "bunk beds",
+        "room walls / windows",
+        "floor",
+        "any furniture drawn in the painting"
+      ],
+      "separateCutoutsAvailable": [
+        "cutouts/nova-astronaut-boy.png",
+        "cutouts/astronaut-girl-with-helmet.png",
+        "cutouts/astronaut-girl-with-glasses.png"
+      ],
+      "depth": "depth/crew-quarters-bunks-depth.png"
+    },
+    {
+      "id": "greenhouse",
+      "file": "greenhouse-interior.jpeg",
+      "size": [1408, 768],
+      "role": "Greenhouse interior",
+      "bakedIn": [
+        "glass house frame and beams",
+        "cobble path",
+        "left and right plant benches / trays",
+        "potted plants and flowers",
+        "watering can (foreground right)",
+        "wicker baskets",
+        "shovel / trowel",
+        "back potting bench and door",
+        "climbing vines"
+      ],
+      "separateCutoutsAvailable": [
+        "cutouts/nova-astronaut-boy.png",
+        "cutouts/astronaut-girl-with-glasses.png (Mira proxy)",
+        "cutouts/greenhouse-dome.png (exterior only)",
+        "cutouts/greenhouse-plant-tray-proxy.png (extracted proxy for occlusion demo)"
+      ],
+      "depth": "depth/greenhouse-interior-depth.png"
+    },
+    {
+      "id": "lab",
+      "file": "science-lab-nova-notebook.jpeg",
+      "size": [1408, 768],
+      "role": "Science lab interior",
+      "bakedIn": [
+        "lab benches / shelves",
+        "notebook / papers on desk",
+        "wall panels",
+        "floor",
+        "any instruments drawn in the painting"
+      ],
+      "separateCutoutsAvailable": [
+        "cutouts/nova-astronaut-boy.png",
+        "cutouts/astronaut-girl-with-helmet.png (Ana proxy)"
+      ],
+      "depth": "depth/science-lab-nova-notebook-depth.png"
+    }
+  ]
+}
