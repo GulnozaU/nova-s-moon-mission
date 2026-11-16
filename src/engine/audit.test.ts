@@ -32,9 +32,9 @@ describe("decision audit (Section 3.9)", () => {
     const gh = DECISION_AUDIT.find((g) => g.id === "greenhouse");
     expect(gh).toBeDefined();
     expect(GREENHOUSE_COST).toBe(1);
-    expect(GREENHOUSE_WATER).toBe(2);
+    expect(GREENHOUSE_WATER).toBe(1);
     expect(DIFFICULTY.greenhouseOxygen).toBe(1);
-    expect(DIFFICULTY.greenhouseScience).toBe(1);
+    expect(DIFFICULTY.greenhouseScience).toBe(2);
   });
 });
 

@@ -2,6 +2,7 @@ import type { DayDecisions } from "../../engine/types";
 import {
   COMMS_COST,
   GREENHOUSE_COST,
+  GREENHOUSE_WATER,
   HEAT_COST,
   OXYGEN_MAKER_COST,
   RECYCLER_COST,
@@ -121,7 +122,7 @@ export function PowerTradePanel({
           icon={ART.greenhouseDome}
           title="Water the plants"
           help="+1 oxygen and +1 science"
-          cost={`−${GREENHOUSE_COST} power and −2 water`}
+          cost={`−${GREENHOUSE_COST} power and −${GREENHOUSE_WATER} water`}
           onClick={() =>
             onDecisions({ ...decisions, greenhouse: !decisions.greenhouse })
           }

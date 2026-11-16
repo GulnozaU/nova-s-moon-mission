@@ -183,7 +183,7 @@ export function PhaserPlay({
       <div className="phaser-play__canvas" ref={hostRef} />
       {visible ? (
         <p className="phaser-play__hint">
-          Arrows / WASD or tap to walk · stand still on a circle · bed ends the day
+          Arrows / WASD or tap to walk · enter buildings · stand on circles · bed ends the day
         </p>
       ) : null}
     </section>

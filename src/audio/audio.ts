@@ -30,9 +30,9 @@ export type SfxId =
   | "missionFail";
 
 const MUTE_KEY = "nova-mute";
-const MASTER_DEFAULT = 0.5;
+const MASTER_DEFAULT = 0.72;
 /** Ambient bed gain (pre-master). Soft pad under everything. */
-const AMBIENT_GAIN = 0.11;
+const AMBIENT_GAIN = 0.18;
 /** Loudest SFX relative to ambient: +6 dB ≈ ×2. */
 const SFX_CEILING = AMBIENT_GAIN * 2;
 const MAX_PER_SEC = 4;

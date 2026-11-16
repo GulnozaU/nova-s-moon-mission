@@ -319,7 +319,7 @@ export function useGameSession(): GameSession {
       );
       const trimmed = trimDecisionsToBudget(defaultDecisions(), power);
       setDecisions(trimmed.decisions);
-      setNovaLine(novaTrimSpeech(trimmed.turnedOff));
+      setNovaLine(novaTrimSpeech(trimmed.turnedOff, 1));
       setCommsYesterday(false);
       setSheltering(false);
       setLastResult(null);
@@ -392,7 +392,7 @@ export function useGameSession(): GameSession {
       // Carry plan forward, then shut off what we cannot afford.
       const trimmed = trimDecisionsToBudget(usedDecisions, power);
       setDecisions(trimmed.decisions);
-      setNovaLine(novaTrimSpeech(trimmed.turnedOff));
+      setNovaLine(novaTrimSpeech(trimmed.turnedOff, result.state.day));
       setSheltering(false);
       setLastResult(null);
       setLastChoice(null);

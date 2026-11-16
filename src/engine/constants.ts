@@ -144,9 +144,11 @@ export const DIFFICULTY: DifficultyConfig = {
   sciencePointsRim: 1.5,
 
   greenhouseCost: 1, // ASSUMPTION
-  greenhouseWater: 2, // ASSUMPTION
+  // 1 water keeps plants useful-but-costly, not a rim death trap. ASSUMPTION (Stage 1b).
+  greenhouseWater: 1, // ASSUMPTION
   greenhouseOxygen: 1, // ASSUMPTION
-  greenhouseScience: 1, // ASSUMPTION
+  // Enough that a plant-heavy plan can sometimes hit the science goal. ASSUMPTION (Stage 1b).
+  greenhouseScience: 2, // ASSUMPTION
 
   oxygenUsePerDay: 3,
 

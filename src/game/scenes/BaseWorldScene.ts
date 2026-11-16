@@ -3,14 +3,9 @@ import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import { isDaylight } from "../../ui/teach/dayNight";
 import { plannedPowerCost } from "../../ui/powerMath";
-import {
-  applyMovement,
-  makeKeys,
-  type ControlKeys,
-} from "../playerControls";
+import { applyMovement, makeKeys, type ControlKeys } from "../playerControls";
 import {
   addShadow,
-  dayNightCrossfade,
   dustPuff,
   floatNumber,
   idleBreathe,
@@ -21,38 +16,27 @@ import {
   setPlantHealth,
   shieldShimmer,
   sparkBurst,
-  stormImpactFx,
   stormWarningPulse,
   twinkleStars,
   walkHop,
-  workingLoop,
 } from "../anim";
 import { DwellCircle, STILL_SPEED } from "../dwellCircle";
 import { THEME } from "../theme";
 import { createRng } from "../../engine/rng";
 import {
   COMMS_COST,
-  GREENHOUSE_COST,
-  GREENHOUSE_OXYGEN,
-  GREENHOUSE_SCIENCE,
-  GREENHOUSE_WATER,
-  HEAT_COST,
   LOSE_OXYGEN_AT,
   LOSE_WATER_AT,
-  OXYGEN_MAKER_COST,
-  OXYGEN_MAKER_GAIN,
-  RECYCLER_COST,
   SCIENCE_COST_PER_LEVEL,
   SCIENCE_LEVEL_MAX,
+  SCIENCE_SUCCESS_TARGET,
   START_OXYGEN,
   START_WATER,
-  WATER_USE_WITHOUT_RECYCLER,
-  WATER_USE_WITH_RECYCLER,
 } from "../../engine/constants";
 
 /**
- * Full day loop (reference-style): walk, dwell on glowing circles, bed ends day.
- * No Plan-day menus or scrolling result pages.
+ * Outdoor base: walk into buildings, shelter / science outdoors, bed ends the day.
+ * Machines live inside rooms (IndoorScene).
  */
 export class BaseWorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -69,6 +53,8 @@ export class BaseWorldScene extends Phaser.Scene {
   private oxyFill: Phaser.GameObjects.Rectangle | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   private powerHud!: Phaser.GameObjects.Container;
+  private powerTitle!: Phaser.GameObjects.Text;
+  private powerCells: Phaser.GameObjects.Rectangle[] = [];
   private resourceHud!: Phaser.GameObjects.Text;
   private alertText!: Phaser.GameObjects.Text;
   private alertPulse: Phaser.Tweens.Tween | null = null;
@@ -79,6 +65,8 @@ export class BaseWorldScene extends Phaser.Scene {
   private walkTarget: { x: number; y: number } | null = null;
   private lastOxyOn: boolean | null = null;
   private lastGreenhouse: boolean | null = null;
+  private lastHudKey = "";
+  private lastComms: boolean | null = null;
 
   constructor() {
     super("base");
@@ -86,6 +74,15 @@ export class BaseWorldScene extends Phaser.Scene {
 
   create() {
     const { width: W, height: H } = this.scale;
+    this.ending = false;
+    this.lastHudKey = "";
+    this.circles = [];
+    this.powerCells = [];
+    this.dishSpin = null;
+    this.panelTween = null;
+    this.alertPulse = null;
+    this.bubbleTimer = null;
+
     let night = false;
     try {
       const s = bridge().getState();
@@ -93,7 +90,6 @@ export class BaseWorldScene extends Phaser.Scene {
     } catch {
       /* */
     }
-    dayNightCrossfade(this, night);
 
     let seed = 42;
     try {
@@ -114,7 +110,7 @@ export class BaseWorldScene extends Phaser.Scene {
     } else {
       const rng = createRng(seed);
       const stars: Phaser.GameObjects.Arc[] = [];
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 16; i++) {
         stars.push(
           this.add.circle(rng() * W, rng() * H * 0.35, 1.2, 0xffffff, 0.8).setDepth(2),
         );
@@ -123,10 +119,9 @@ export class BaseWorldScene extends Phaser.Scene {
     }
     this.add.image(W * 0.08, H * 0.1, "earth").setDisplaySize(64, 64).setDepth(3);
 
-    // Decorative buildings (not click menus — circles do the work).
-    this.add.image(W * 0.18, H * 0.4, "habitat").setDisplaySize(110, 95).setDepth(6);
-    this.add.image(W * 0.48, H * 0.36, "greenhouse").setDisplaySize(100, 95).setDepth(6);
-    this.add.image(W * 0.78, H * 0.4, "labCottage").setDisplaySize(100, 95).setDepth(6);
+    this.placeDoor("home", "Crew home", W * 0.18, H * 0.4, "habitat", 110, 95);
+    this.placeDoor("greenhouse", "Greenhouse", W * 0.48, H * 0.36, "greenhouse", 100, 95);
+    this.placeDoor("lab", "Science lab", W * 0.78, H * 0.4, "labCottage", 100, 95);
 
     this.panelsImg = this.add
       .image(W * 0.32, H * 0.68, "panels")
@@ -141,13 +136,7 @@ export class BaseWorldScene extends Phaser.Scene {
     this.buildTanks(W, H);
     this.buildPlants(W, H);
     this.buildHud(W, H);
-    this.buildCircles(W, H);
-
-    const crewA = this.add.image(W * 0.4, H * 0.58, "girl").setDisplaySize(44, 58).setDepth(12);
-    const crewB = this.add.image(W * 0.58, H * 0.6, "worker").setDisplaySize(44, 58).setDepth(12);
-    idleBreathe(this, crewA);
-    idleBreathe(this, crewB);
-    workingLoop(this, crewA);
+    this.buildOutdoorCircles(W, H);
 
     this.player = this.physics.add
       .sprite(W * 0.5, H * 0.72, "nova")
@@ -164,28 +153,29 @@ export class BaseWorldScene extends Phaser.Scene {
     this.walkSync = walkHop(this.player, (x, y) => {
       dustPuff(this, x, y);
       const now = this.time.now;
-      if (now - this.lastFootstep > 280) {
+      if (now - this.lastFootstep > 420) {
         this.lastFootstep = now;
         audio.play("footstep");
       }
     }).sync;
 
     this.keys = makeKeys(this);
-    // Tap-to-walk: click empty ground.
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (this.ending) return;
-      if (!bridge().ready()) return;
-      this.walkTarget = { x: p.worldX, y: Phaser.Math.Clamp(p.worldY, H * 0.38, H * 0.88) };
+      if (this.ending || !bridge().ready()) return;
+      this.walkTarget = {
+        x: p.worldX,
+        y: Phaser.Math.Clamp(p.worldY, H * 0.38, H * 0.88),
+      };
     });
 
-    this.time.delayedCall(120, () => this.beginDay());
+    this.time.delayedCall(100, () => this.beginDay());
   }
 
   private beginDay() {
     if (!bridge().ready()) return;
     this.ending = false;
     this.lastDay = bridge().getDay();
-    audio.play("dayStart");
+    if (this.lastDay === 1) audio.play("dayStart");
     try {
       const shields = bridge().getState().shieldLevel;
       if (shields > 0) {
@@ -196,9 +186,50 @@ export class BaseWorldScene extends Phaser.Scene {
     }
     this.refreshWorldFx(true);
     this.refreshAlerts();
-    this.refreshHud();
+    this.refreshHud(true);
     for (const c of this.circles) c.refresh();
-    this.novaBubble.setText(bridge().getNovaLine() || "Stand still on a circle to switch it on.");
+    this.novaBubble.setText(
+      bridge().getNovaLine() ||
+        "Walk into a building. Stand on circles to switch machines. Bed ends the day.",
+    );
+  }
+
+  private placeDoor(
+    room: "home" | "greenhouse" | "lab",
+    label: string,
+    x: number,
+    y: number,
+    key: string,
+    w: number,
+    h: number,
+  ) {
+    this.add.image(x, y, key).setDisplaySize(w, h).setDepth(6);
+    this.add
+      .text(x, y - h * 0.55, label, {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "12px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(25);
+
+    const c = new DwellCircle(this, {
+      id: `door-${room}`,
+      x,
+      y: y + h * 0.35,
+      label: `Enter ${label}`,
+      costBenefit: "Stand still to go inside",
+      radius: 32,
+      getOn: () => false,
+      onComplete: () => {
+        audio.play("door");
+        sparkBurst(this, x, y);
+        this.scene.start("indoor", { room });
+      },
+    });
+    this.circles.push(c);
   }
 
   private buildTanks(W: number, H: number) {
@@ -238,6 +269,24 @@ export class BaseWorldScene extends Phaser.Scene {
 
   private buildHud(W: number, H: number) {
     this.powerHud = this.add.container(12, 10).setDepth(70).setScrollFactor(0);
+    this.powerTitle = this.add.text(0, 0, "Day 1/10 · Power", {
+      fontFamily: THEME.fontDisplay,
+      fontSize: "13px",
+      color: THEME.ink,
+      backgroundColor: THEME.cream,
+      padding: { x: 8, y: 4 },
+    });
+    this.powerHud.add(this.powerTitle);
+    // Cap cells once; tint later (never destroy each frame).
+    for (let i = 0; i < 20; i++) {
+      const cell = this.add
+        .rectangle(8 + i * 18, 28, 14, 22, 0x6a6570, 0.35)
+        .setStrokeStyle(1, THEME.line, 0.35)
+        .setVisible(false);
+      this.powerHud.add(cell);
+      this.powerCells.push(cell);
+    }
+
     this.resourceHud = this.add
       .text(12, 48, "", {
         fontFamily: THEME.font,
@@ -289,8 +338,7 @@ export class BaseWorldScene extends Phaser.Scene {
       .setAlpha(0.75);
   }
 
-  private buildCircles(W: number, H: number) {
-    this.circles = [];
+  private buildOutdoorCircles(W: number, H: number) {
     const add = (
       id: string,
       x: number,
@@ -301,111 +349,50 @@ export class BaseWorldScene extends Phaser.Scene {
       onComplete: (wasOn: boolean) => void,
       isAvailable?: () => boolean,
     ) => {
-      const c = new DwellCircle(this, {
-        id,
-        x,
-        y,
-        label,
-        costBenefit,
-        getOn,
-        onComplete,
-        isAvailable,
-      });
-      this.circles.push(c);
+      this.circles.push(
+        new DwellCircle(this, {
+          id,
+          x,
+          y,
+          label,
+          costBenefit,
+          getOn,
+          onComplete,
+          isAvailable,
+        }),
+      );
     };
-
-    // Heat is forced — show as always-on info circle (no toggle).
-    add(
-      "heat",
-      W * 0.22,
-      H * 0.62,
-      "Heat",
-      `−${HEAT_COST} power · keeps crew warm`,
-      () => true,
-      () => {
-        bridge().setNovaLine("Heat stays on every day. It always costs power.");
-        this.novaBubble.setText(bridge().getNovaLine());
-        audio.play("uiClick");
-      },
-    );
-
-    add(
-      "recycler",
-      W * 0.34,
-      H * 0.78,
-      "Water cleaner",
-      `−${RECYCLER_COST} power · saves ${WATER_USE_WITHOUT_RECYCLER - WATER_USE_WITH_RECYCLER} water`,
-      () => bridge().getDecisions().recycler,
-      (wasOn) => this.toggleJob("recycler", wasOn, "waterTrickle"),
-    );
-
-    add(
-      "air",
-      W * 0.48,
-      H * 0.78,
-      "Air maker",
-      `−${OXYGEN_MAKER_COST} power · +${OXYGEN_MAKER_GAIN} oxygen`,
-      () => bridge().getDecisions().oxygenMaker,
-      (wasOn) => this.toggleJob("oxygenMaker", wasOn, "airHiss"),
-    );
-
-    add(
-      "radio",
-      W * 0.62,
-      H * 0.78,
-      "Radio",
-      `−${COMMS_COST} power · storm warning next day`,
-      () => bridge().getDecisions().comms,
-      (wasOn) => this.toggleJob("comms", wasOn, "powerHum"),
-    );
-
-    add(
-      "plants",
-      W * 0.48,
-      H * 0.52,
-      "Water plants",
-      `−${GREENHOUSE_COST} power −${GREENHOUSE_WATER} water · +${GREENHOUSE_OXYGEN} O₂ +${GREENHOUSE_SCIENCE} science`,
-      () => Boolean(bridge().getDecisions().greenhouse),
-      (wasOn) => this.toggleJob("greenhouse", wasOn, "plantSparkle"),
-    );
 
     add(
       "science",
       W * 0.78,
-      H * 0.62,
+      H * 0.72,
       "Science walk",
-      `−${SCIENCE_COST_PER_LEVEL} power each · +science +risk`,
+      `−${SCIENCE_COST_PER_LEVEL} power · +science +risk`,
       () => bridge().getDecisions().scienceLevel > 0,
       (wasOn) => {
-        if (!this.canAffordFlip("scienceLevel", wasOn)) return;
-        if (wasOn) {
-          bridge().patchDecisions({ scienceLevel: 0 });
-          audio.play("toggleOff");
-        } else {
-          bridge().patchDecisions({
-            scienceLevel: Math.min(SCIENCE_LEVEL_MAX, 1),
-          });
-          audio.play("toggleOn");
-          floatNumber(this, W * 0.78, H * 0.55, "+science", THEME.sageInk);
-        }
-        sparkBurst(this, W * 0.78, H * 0.58);
+        if (!this.canAfford(!wasOn, { scienceLevel: wasOn ? 0 : 1 })) return;
+        bridge().patchDecisions({
+          scienceLevel: wasOn ? 0 : Math.min(SCIENCE_LEVEL_MAX, 1),
+        });
+        audio.play(wasOn ? "toggleOff" : "toggleOn");
+        if (!wasOn) floatNumber(this, W * 0.78, H * 0.65, "+science", THEME.sageInk);
+        sparkBurst(this, W * 0.78, H * 0.68);
         this.afterToggle();
       },
     );
 
     add(
       "shield",
-      W * 0.18,
-      H * 0.52,
+      W * 0.28,
+      H * 0.78,
       "Build shield",
       "−2 materials · less storm risk",
       () => Boolean(bridge().getDecisions().buildShield),
       (wasOn) => {
-        const mats = bridge().getState().materials;
-        if (!wasOn && mats < 2) {
+        if (!wasOn && bridge().getState().materials < 2) {
           bridge().setNovaLine("Need 2 materials to build a shield.");
           this.novaBubble.setText(bridge().getNovaLine());
-          audio.play("uiClick");
           return;
         }
         bridge().patchDecisions({ buildShield: !wasOn });
@@ -425,86 +412,46 @@ export class BaseWorldScene extends Phaser.Scene {
       (wasOn) => {
         bridge().setSheltering(!wasOn);
         audio.play(wasOn ? "toggleOff" : "shelterClose");
-        if (!wasOn) {
-          sparkBurst(this, W * 0.18, H * 0.68, 0xa8e6ff);
-          bridge().setNovaLine("Shelter ready. Stand on the bed when you are done.");
-        } else {
-          bridge().setNovaLine("Shelter off — we will stay out if a storm hits.");
-        }
+        bridge().setNovaLine(
+          wasOn
+            ? "Shelter off — we will stay out if a storm hits."
+            : "Shelter ready. Go inside and use the bed when done.",
+        );
         this.novaBubble.setText(bridge().getNovaLine());
         this.afterToggle();
       },
-      () => {
-        const ev = bridge().getEvent();
-        return Boolean(ev?.stormSeverity !== undefined);
-      },
+      () => bridge().getEvent()?.stormSeverity !== undefined,
     );
 
+    // Quick outdoor radio (also available inside home).
     add(
-      "filter",
-      W * 0.34,
-      H * 0.62,
-      "Clean filter",
-      "−1 material −1 power · unclog cleaner",
-      () => Boolean(bridge().getDecisions().cleanFilter),
-      (wasOn) => {
-        if (!wasOn && (bridge().getState().recyclerEfficiency ?? 1) >= 1) {
-          bridge().setNovaLine("Filter is already clean.");
-          this.novaBubble.setText(bridge().getNovaLine());
-          return;
-        }
-        this.toggleJob("cleanFilter", wasOn);
-      },
-      () => (bridge().getState().recyclerEfficiency ?? 1) < 1 || bridge().getDecisions().cleanFilter === true,
-    );
-
-    add(
-      "bed",
-      W * 0.88,
-      H * 0.82,
-      "Bed — end day",
-      "Stand here to finish today",
-      () => false,
-      () => this.finishDay(),
+      "radio",
+      W * 0.62,
+      H * 0.78,
+      "Radio",
+      `−${COMMS_COST} power · storm warning next day`,
+      () => bridge().getDecisions().comms,
+      (wasOn) => this.toggleBool("comms", wasOn, "powerHum"),
     );
   }
 
-  private toggleJob(
+  private toggleBool(
     key: "recycler" | "oxygenMaker" | "comms" | "greenhouse" | "cleanFilter",
     wasOn: boolean,
     sfx?: "waterTrickle" | "airHiss" | "powerHum" | "plantSparkle",
   ) {
-    if (!this.canAffordFlip(key, wasOn)) return;
+    if (!this.canAfford(!wasOn, { [key]: !wasOn })) return;
     bridge().patchDecisions({ [key]: !wasOn });
     audio.play(wasOn ? "toggleOff" : "toggleOn");
     if (!wasOn && sfx) audio.play(sfx);
-    const x = this.player.x;
-    const y = this.player.y - 30;
-    sparkBurst(this, x, y);
-    if (!wasOn) {
-      if (key === "recycler") floatNumber(this, x, y, "+water save", THEME.sageInk);
-      if (key === "oxygenMaker") floatNumber(this, x, y, "+O₂", THEME.sageInk);
-      if (key === "greenhouse") floatNumber(this, x, y, "+plants", THEME.sageInk);
-    }
+    sparkBurst(this, this.player.x, this.player.y - 24);
     this.afterToggle();
   }
 
-  private canAffordFlip(
-    key:
-      | "recycler"
-      | "oxygenMaker"
-      | "comms"
-      | "greenhouse"
-      | "cleanFilter"
-      | "scienceLevel"
-      | "buildShield",
-    wasOn: boolean,
-  ): boolean {
-    if (wasOn) return true;
-    const d = { ...bridge().getDecisions() };
-    if (key === "scienceLevel") d.scienceLevel = Math.max(1, d.scienceLevel || 1);
-    else (d as Record<string, unknown>)[key] = true;
-    if (plannedPowerCost(d) > bridge().getPowerToday()) {
+  private canAfford(turningOn: boolean, patch: Record<string, unknown>): boolean {
+    if (!turningOn) return true;
+    const d = { ...bridge().getDecisions(), ...patch };
+    if (plannedPowerCost(d as never) > bridge().getPowerToday()) {
       bridge().setNovaLine("Not enough power cells left for that.");
       this.novaBubble.setText(bridge().getNovaLine());
       audio.play("uiClick");
@@ -514,89 +461,39 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   private afterToggle() {
-    this.refreshHud();
+    this.refreshHud(true);
     this.refreshWorldFx(false);
     for (const c of this.circles) c.refresh();
   }
 
-  private finishDay() {
-    if (this.ending || !bridge().ready()) return;
-    this.ending = true;
-    this.walkTarget = null;
-    this.player.setVelocity(0, 0);
-    audio.play("door");
-
-    const event = bridge().getEvent();
-    const isStorm = event?.stormSeverity !== undefined;
-    if (isStorm) {
-      audio.play("stormHit");
-      stormImpactFx(this);
-      if (bridge().getSheltering()) {
-        audio.play("shelterClose");
-        bridge().setNovaLine("We sheltered. Safer — but no outdoor science today.");
-      } else {
-        bridge().setNovaLine("We stayed out in the storm. Risk went up.");
-      }
-      this.novaBubble.setText(bridge().getNovaLine());
-    }
-
-    this.time.delayedCall(isStorm ? 700 : 200, () => {
-      const deltas = bridge().endDay();
-      audio.play("dayEnd");
-      this.showDeltaFloaters(deltas);
-    });
-  }
-
-  private showDeltaFloaters(
-    deltas: { before: number; after: number; label: string }[],
-  ) {
-    const { width: W, height: H } = this.scale;
-    deltas.slice(0, 4).forEach((d, i) => {
-      const delta = d.after - d.before;
-      if (delta === 0) return;
-      const sign = delta > 0 ? "+" : "";
-      floatNumber(
-        this,
-        W * (0.3 + i * 0.15),
-        H * 0.45,
-        `${sign}${Number.isInteger(delta) ? delta : delta.toFixed(1)} ${d.label}`,
-        delta >= 0 ? THEME.sageInk : THEME.rose,
-      );
-      audio.play(delta > 0 ? "resourceUp" : "resourceDown");
-    });
-  }
-
-  private refreshHud() {
+  private refreshHud(force = false) {
     if (!bridge().ready()) return;
     const power = bridge().getPowerToday();
     const spent = plannedPowerCost(bridge().getDecisions());
     const left = Math.max(0, power - spent);
-    this.powerHud.removeAll(true);
-    const title = this.add
-      .text(0, 0, `Day ${bridge().getDay()}/10 · Power`, {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "13px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 8, y: 4 },
-      });
-    this.powerHud.add(title);
-    for (let i = 0; i < power; i++) {
-      const filled = i < left;
-      const cell = this.add
-        .rectangle(8 + i * 18, 28, 14, 22, filled ? 0xffe08a : 0x6a6570, filled ? 0.95 : 0.35)
-        .setStrokeStyle(1, THEME.line, 0.35);
-      this.powerHud.add(cell);
-    }
     const s = bridge().getState();
+    const key = `${s.day}|${power}|${left}|${s.water}|${s.oxygen}|${s.science}|${s.exposure.toFixed(0)}|${s.materials}`;
+    if (!force && key === this.lastHudKey) return;
+    this.lastHudKey = key;
+
+    this.powerTitle.setText(`Day ${s.day}/10 · Power`);
+    for (let i = 0; i < this.powerCells.length; i++) {
+      const cell = this.powerCells[i]!;
+      if (i >= power) {
+        cell.setVisible(false);
+        continue;
+      }
+      cell.setVisible(true);
+      const filled = i < left;
+      cell.setFillStyle(filled ? 0xffe08a : 0x6a6570, filled ? 0.95 : 0.35);
+    }
     this.resourceHud.setText(
-      `💧${s.water}  O₂${s.oxygen}  🔬${s.science}  ⚠${s.exposure.toFixed(0)}  mats ${s.materials}`,
+      `💧${s.water}  O₂${s.oxygen}  Science goal: ${s.science} / ${SCIENCE_SUCCESS_TARGET}  ⚠${s.exposure.toFixed(0)}  mats ${s.materials}`,
     );
   }
 
   private refreshAlerts() {
     if (!bridge().ready()) return;
-    // Warnings only if radio was on yesterday (wired in session).
     const alerts = bridge().getStormAlerts();
     if (alerts.length === 0) {
       this.alertText.setVisible(false);
@@ -617,27 +514,28 @@ export class BaseWorldScene extends Phaser.Scene {
     const d = bridge().getDecisions();
     const st = bridge().getState();
 
-    // Dish
-    if (d.comms && !this.dishSpin && this.dishImg) {
-      this.dishSpin = this.tweens.add({
-        targets: this.dishImg,
-        angle: 360,
-        duration: reduceMotion() ? 1 : 4000,
-        repeat: -1,
-      });
-      if (reduceMotion()) this.dishSpin.pause();
-    } else if (!d.comms && this.dishSpin) {
-      this.dishSpin.stop();
-      this.dishSpin = null;
-      this.dishImg?.setAngle(0);
+    const commsOn = Boolean(d.comms);
+    if (force || commsOn !== this.lastComms) {
+      this.lastComms = commsOn;
+      if (commsOn && !this.dishSpin && this.dishImg) {
+        this.dishSpin = this.tweens.add({
+          targets: this.dishImg,
+          angle: 360,
+          duration: reduceMotion() ? 1 : 4000,
+          repeat: -1,
+        });
+        if (reduceMotion()) this.dishSpin.pause();
+      } else if (!commsOn && this.dishSpin) {
+        this.dishSpin.stop();
+        this.dishSpin = null;
+        this.dishImg?.setAngle(0);
+      }
     }
 
-    // Panels glow with remaining power story
     if (this.panelsImg && !this.panelTween) {
       this.panelTween = panelGlow(this, this.panelsImg, true);
     }
 
-    // Tanks
     const water01 =
       (st.water - LOSE_WATER_AT) / Math.max(1, START_WATER - LOSE_WATER_AT);
     const oxy01 =
@@ -662,9 +560,7 @@ export class BaseWorldScene extends Phaser.Scene {
     const plantsOn = Boolean(d.greenhouse);
     if (force || plantsOn !== this.lastGreenhouse) {
       this.lastGreenhouse = plantsOn;
-      for (const leaf of this.plantLeaves) {
-        setPlantHealth(leaf, plantsOn, this);
-      }
+      for (const leaf of this.plantLeaves) setPlantHealth(leaf, plantsOn);
     }
   }
 
@@ -679,23 +575,17 @@ export class BaseWorldScene extends Phaser.Scene {
 
     if (this.ending) {
       this.player.setVelocity(0, 0);
-      this.refreshHud();
       return;
     }
 
-    // Tap-to-walk steering (keyboard overrides).
     let pad = { x: 0, y: 0 };
     if (this.walkTarget) {
       const dx = this.walkTarget.x - this.player.x;
       const dy = this.walkTarget.y - this.player.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < 12) {
-        this.walkTarget = null;
-      } else {
-        pad = { x: dx / dist, y: dy / dist };
-      }
+      if (dist < 12) this.walkTarget = null;
+      else pad = { x: dx / dist, y: dy / dist };
     }
-    // Keyboard cancels tap target.
     if (this.keys) {
       const k = this.keys;
       if (
@@ -717,15 +607,12 @@ export class BaseWorldScene extends Phaser.Scene {
     this.walkSync?.();
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const speed = Math.hypot(body.velocity.x, body.velocity.y);
-    const still = speed < STILL_SPEED;
-
+    const still = Math.hypot(body.velocity.x, body.velocity.y) < STILL_SPEED;
     for (const c of this.circles) {
-      const inside = c.contains(this.player.x, this.player.y);
-      c.update(inside && still, dt);
+      c.update(c.contains(this.player.x, this.player.y) && still, dt);
     }
 
-    this.refreshHud();
+    this.refreshHud(false);
     this.refreshWorldFx(false);
     const line = bridge().getNovaLine();
     if (line && this.novaBubble.text !== line) this.novaBubble.setText(line);

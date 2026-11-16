@@ -134,25 +134,38 @@ const strategies: Record<StrategyId, StrategyFn> = {
     };
   },
 
+  // Plants when water allows; one early shield; stays out in storms (risky).
+  // Greenhouse is useful (+science/+O₂) but costly (power, water, storm risk).
   greenhouse_heavy: ({
     day,
     isStorm,
     materials,
     shieldLevel,
     recyclerEfficiency,
-  }) => ({
-    decisions: {
-      recycler: true,
-      oxygenMaker: true,
-      comms: false,
-      scienceLevel: 0,
-      greenhouse: true,
-      buildShield: materials >= 2 && shieldLevel < 1 && day <= 2,
-      buildPanel: false,
-      cleanFilter: recyclerEfficiency < 1 && materials >= 1,
-    },
-    choice: isStorm ? (day >= 8 ? "B" : "A") : "A",
-  }),
+    state,
+    site,
+  }) => {
+    const isPlainNight = site === "plain" && day > PLAIN_LIT_DAYS;
+    const bankForNight = site === "plain" && day === PLAIN_LIT_DAYS;
+    return {
+      decisions: {
+        recycler: true,
+        // Plain: bank air-maker power for nights; rim runs air every day.
+        oxygenMaker: site === "rim" ? true : isPlainNight || bankForNight,
+        comms: false,
+        scienceLevel: 0,
+        greenhouse:
+          !isStorm &&
+          !bankForNight &&
+          state.water >= 10,
+        buildShield: materials >= 2 && shieldLevel < 1 && day <= 2,
+        buildPanel: false,
+        cleanFilter: recyclerEfficiency < 1 && materials >= 1,
+      },
+      // Stay out in storms — plants help, but storms still hurt.
+      choice: isStorm ? "B" : "A",
+    };
+  },
 
   random: ({
     isStorm,

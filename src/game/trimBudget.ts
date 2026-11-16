@@ -1,4 +1,4 @@
-import { HEAT_COST } from "../engine/constants";
+import { HEAT_COST, SCIENCE_SUCCESS_TARGET } from "../engine/constants";
 import type { DayDecisions } from "../engine/types";
 import { plannedPowerCost } from "../ui/powerMath";
 
@@ -70,12 +70,18 @@ export function trimDecisionsToBudget(
   return { decisions: next, turnedOff };
 }
 
-export function novaTrimSpeech(turnedOff: string[]): string {
+export function novaTrimSpeech(turnedOff: string[], day = 1): string {
+  const goal =
+    day === 1
+      ? ` Success means last 10 days and Science goal: 0 / ${SCIENCE_SUCCESS_TARGET}.`
+      : "";
   if (turnedOff.length === 0) {
-    return "Stand on a glowing circle to turn a machine on. Bed ends the day.";
+    return (
+      "Stand on a glowing circle to turn a machine on. Bed ends the day." + goal
+    );
   }
   if (turnedOff.length === 1) {
-    return `Not enough power for ${turnedOff[0]}. I turned it off.`;
+    return `Not enough power for ${turnedOff[0]}. I turned it off.` + goal;
   }
-  return `Not enough power. I turned off: ${turnedOff.join(", ")}.`;
+  return `Not enough power. I turned off: ${turnedOff.join(", ")}.` + goal;
 }

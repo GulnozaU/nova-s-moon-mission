@@ -245,26 +245,16 @@ export function animateTankLevel(
   });
 }
 
-/** Plants grow (tall) or droop (brown, tilted). */
+/** Plants grow (tall) or droop (brown, tilted). No looping tweens. */
 export function setPlantHealth(
   leaf: Phaser.GameObjects.Ellipse,
   healthy: boolean,
-  scene: Phaser.Scene,
+  _scene?: Phaser.Scene,
 ) {
   if (healthy) {
     leaf.setFillStyle(0x3a9a4a);
-    if (!reduceMotion()) {
-      scene.tweens.add({
-        targets: leaf,
-        scaleY: 1.08,
-        angle: 0,
-        duration: 400,
-        yoyo: true,
-      });
-    } else {
-      leaf.setScale(1, 1);
-      leaf.setAngle(0);
-    }
+    leaf.setScale(1, 1);
+    leaf.setAngle(0);
   } else {
     leaf.setFillStyle(0x8a6a3a);
     leaf.setScale(1, 0.65);
@@ -272,7 +262,7 @@ export function setPlantHealth(
   }
 }
 
-/** Storm warning pulse on a banner. */
+/** Storm warning pulse on a banner (alpha only — scale shook the UI). */
 export function stormWarningPulse(
   scene: Phaser.Scene,
   target: Phaser.GameObjects.GameObject,
@@ -281,7 +271,6 @@ export function stormWarningPulse(
   return scene.tweens.add({
     targets: target,
     alpha: { from: 1, to: 0.55 },
-    scale: { from: 1, to: 1.04 },
     duration: 550,
     yoyo: true,
     repeat: -1,
