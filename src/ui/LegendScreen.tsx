@@ -54,6 +54,32 @@ export function LegendScreen({ onBack }: Props) {
         ))}
       </ul>
 
+      <h3>How we use DONKI</h3>
+      <p>
+        DONKI is NASA&apos;s Database Of Notifications, Knowledge, Information —
+        the CCMC catalog of real solar flares and coronal mass ejections (CMEs).
+        We fetch flare (FLR) and CME records from the public DONKI API when the
+        mission starts. If the live call fails, we fall back to archived real
+        DONKI events shipped with the game.
+      </p>
+      <ul className="legend-sources">
+        <li>
+          Flare class letters (C / M / X) map to storm severity 1 / 2 / 3 — that
+          numeric map is an ASSUMPTION for play balance; the flare IDs and dates
+          are real DONKI records.
+        </li>
+        <li>
+          CME speed from DONKI analysis drives warning time: travel hours ≈
+          149,600,000 km ÷ speed, then warning days = floor(hours ÷ 24). Without
+          radio/comms, warning days are halved.
+        </li>
+        <li>
+          Two storm days are scheduled in the 10-day run from those DONKI
+          records. Alerts and storm cards show the real event date and flare ID
+          when known. Kids see plain language; this page keeps the source name.
+        </li>
+      </ul>
+
       <div className="panel__actions">
         <button type="button" className="btn primary" onClick={onBack}>
           Back

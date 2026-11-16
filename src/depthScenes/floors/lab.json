@@ -1,0 +1,26 @@
+{
+  "id": "lab",
+  "painting": "/art/science-lab-nova-notebook.jpeg",
+  "depth": "/art/depth/science-lab-nova-notebook-depth.png",
+  "paintingSize": [1408, 768],
+  "worldSize": [16, 10],
+  "floorPolygonUv": [
+    [0.20, 0.94],
+    [0.80, 0.94],
+    [0.82, 0.56],
+    [0.70, 0.46],
+    [0.30, 0.46],
+    [0.18, 0.56]
+  ],
+  "spawnUv": [0.5, 0.86],
+  "doors": [
+    {
+      "id": "exit",
+      "uv": [0.5, 0.92],
+      "radiusUv": 0.08,
+      "to": "surface",
+      "label": "EXIT → surface"
+    }
+  ],
+  "billboards": []
+}

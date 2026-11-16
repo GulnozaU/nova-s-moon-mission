@@ -5,7 +5,7 @@ import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
 import { MuteButton } from "./MuteButton";
 import { PhaserPlay } from "../game/PhaserPlay";
-import { WorldPlay } from "../world3d/WorldPlay";
+import { DepthWorldPlay } from "../depthScenes/DepthWorldPlay";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { getNasaImage } from "../content/images";
@@ -16,7 +16,7 @@ import { SpaceText } from "./teach/SpaceText";
 import type { PlayMode } from "../game/bridge";
 import "./game.css";
 
-/** Default = 3D world. `?mode=2d` launches the Phaser game (branch main-2d snapshot). */
+/** Default = depth-painting world. `?mode=2d` launches the Phaser game (branch main-2d). */
 function playMode2d(): boolean {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).get("mode") === "2d";
@@ -286,7 +286,7 @@ export function GameApp() {
               onOpenGlossary={() => g.setGlossaryOpen(true)}
             />
           ) : (
-            <WorldPlay
+            <DepthWorldPlay
               state={g.state}
               weather={g.weather}
               event={g.todaysEvent}

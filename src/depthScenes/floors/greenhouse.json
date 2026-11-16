@@ -3,36 +3,33 @@
   "painting": "/art/greenhouse-interior.jpeg",
   "depth": "/art/depth/greenhouse-interior-depth.png",
   "paintingSize": [1408, 768],
-  "worldSize": [14, 8],
-  "comment": "Walkable floor polygon in painting UV space (0–1). Origin top-left of painting. Y down.",
+  "worldSize": [16, 10],
   "floorPolygonUv": [
-    [0.40, 0.96],
-    [0.60, 0.96],
-    [0.62, 0.78],
-    [0.58, 0.62],
-    [0.52, 0.52],
-    [0.48, 0.52],
-    [0.42, 0.62],
-    [0.38, 0.78]
+    [0.38, 0.96],
+    [0.62, 0.96],
+    [0.64, 0.78],
+    [0.58, 0.58],
+    [0.52, 0.48],
+    [0.48, 0.48],
+    [0.42, 0.58],
+    [0.36, 0.78]
+  ],
+  "spawnUv": [0.5, 0.88],
+  "doors": [
+    {
+      "id": "exit",
+      "uv": [0.5, 0.94],
+      "radiusUv": 0.08,
+      "to": "surface",
+      "label": "EXIT → surface"
+    }
   ],
   "billboards": [
     {
       "id": "plant_tray_left_front",
-      "kind": "cutout_proxy",
       "url": "/art/cutouts/greenhouse-plant-tray-proxy.png",
       "uv": [0.28, 0.68],
-      "depthBias": 0.35,
-      "scale": 1.35,
-      "note": "Extracted from painting for occlusion; painting still has baked tray"
-    },
-    {
-      "id": "watering_can",
-      "kind": "baked_proxy",
-      "uv": [0.78, 0.78],
-      "depthBias": 0.15,
-      "scale": 0.9,
-      "note": "Still baked into painting — no clean cutout yet"
+      "scale": 1.35
     }
-  ],
-  "spawnUv": [0.5, 0.88]
+  ]
 }
