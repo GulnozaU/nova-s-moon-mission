@@ -27,8 +27,8 @@ export function clipWords(text: string, max = 25): string {
 }
 
 /**
- * Conversational morning briefing after Day 1.
- * Feels like talking with Nova: goal + pick + effect tease.
+ * Conversational morning briefing — step-by-step goal + pick.
+ * Day 1 uses a short coach in MorningTalk; later days branch on state.
  */
 export function morningTalk(
   state: GameState,
@@ -39,6 +39,53 @@ export function morningTalk(
   const day = state.day;
   const stormToday = event?.stormSeverity !== undefined;
   const scienceLeft = Math.max(0, SCIENCE_SUCCESS_TARGET - state.science);
+
+  // Day 2: teach greenhouse after the short Day-1 coach.
+  if (day === 2 && !stormToday) {
+    return {
+      goal: clipWords("Day 2: water the plants with me."),
+      story: clipWords(
+        "Step one: cleaner on. Step two: water trays. Step three: chip the grow light.",
+      ),
+      choices: [
+        {
+          id: "plants",
+          label: "Help plants",
+          hint: "Go to Greenhouse. Tap water, drag onto trays, then chip the light.",
+          patch: { greenhouse: true, recycler: true },
+        },
+        {
+          id: "safer",
+          label: "Life support only",
+          hint: "Stay in Crew home. Chip cleaner and air maker first.",
+          patch: { recycler: true, oxygenMaker: true },
+        },
+      ],
+    };
+  }
+
+  if (day === 3 && !stormToday) {
+    return {
+      goal: clipWords("Day 3: check the lab storm screen."),
+      story: clipWords(
+        "Chip the radio, then visit Lab. Ana will read NASA's real flare note.",
+      ),
+      choices: [
+        {
+          id: "radio",
+          label: "Chip radio first",
+          hint: "Drop a chip on the dish, then walk to the Lab door.",
+          patch: { comms: true },
+        },
+        {
+          id: "lab",
+          label: "Go to Lab",
+          hint: "Enter Lab and tap the storm screen. Then chip the analyzer.",
+          patch: { scienceLevel: 1 },
+        },
+      ],
+    };
+  }
 
   if (stormToday) {
     return {

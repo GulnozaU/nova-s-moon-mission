@@ -17,39 +17,24 @@ import type { PlayMode } from "../game/bridge";
 import { DemoDirector, isDemoMode } from "../demo/DemoDirector";
 import "./game.css";
 
-/** Default = depth-painting world. `?mode=2d` launches the Phaser game (branch main-2d). */
-function playMode2d(): boolean {
+/**
+ * Default = working Phaser 2D (soft-pixel style) with engine/data bridge.
+ * Broken depth world: `?mode=depth` only. Old flag `?mode=2d` still works.
+ */
+function useDepthWorld(): boolean {
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("mode") === "2d";
+  return new URLSearchParams(window.location.search).get("mode") === "depth";
 }
 
-/** One idea per screen — Nova says it; no duplicate body text. */
+/** Short pre-mission chat — one screen. Skip goes straight to site pick. */
 const TRAINING = [
   {
-    art: ART.panels,
+    art: ART.nova,
     nasaSlot: "title" as const,
     lines: [
-      { text: "Hello! I am Nova." },
-      { text: "You only get a few power chips each day." },
-      { text: "Every job helps — and every job costs. Nothing is free." },
-    ],
-  },
-  {
-    art: ART.waterTower,
-    nasaSlot: "greenhouse" as const,
-    lines: [
-      { text: "Power runs the water cleaner." },
-      { text: "The cleaner saves water. Water can make oxygen." },
-      { text: "If you skip the cleaner, tanks fall faster." },
-    ],
-  },
-  {
-    art: ART.iconSun,
-    nasaSlot: "storm" as const,
-    lines: [
-      { text: "NASA watches real storms on the Sun." },
-      { text: "Shelter keeps the crew safer — but you lose science that day." },
-      { text: "Stay out for science — risk goes up. That is a trade-off." },
+      { text: "Chips power every job." },
+      { text: "Drag chips onto machines. Bed ends the day." },
+      { text: "NASA storm data is real. I will guide you step by step." },
     ],
   },
 ];
@@ -60,7 +45,7 @@ export function GameApp() {
   /** Keep one play instance from Day 1 through the end report. */
   const missionLive = Boolean(g.state && g.weather && g.phase !== "welcome");
   const playVisible = g.phase === "base";
-  const use2d = useMemo(() => playMode2d(), []);
+  const depth = useMemo(() => useDepthWorld(), []);
   const demo = useMemo(() => isDemoMode(), []);
 
   const advanceTraining = () => {
@@ -68,8 +53,14 @@ export function GameApp() {
     else g.setTrainingStep(g.trainingStep + 1);
   };
 
+  const skipTraining = () => {
+    audio.unlock();
+    audio.play("uiClick");
+    g.setPhase("site");
+  };
+
   return (
-    <div className={`nova-app${demo ? " is-demo" : ""}`}>
+    <div className={`nova-app soft-pixel${demo ? " is-demo" : ""}`}>
       <DemoDirector
         enabled={demo}
         phase={g.phase}
@@ -154,9 +145,7 @@ export function GameApp() {
 
         {g.phase === "training" ? (
           <section className="screen training-lesson">
-            <p className="eyebrow">
-              Training Day · {g.trainingStep + 1} / {TRAINING.length}
-            </p>
+            <p className="eyebrow">Quick tip · then pick a site</p>
             <div className="training-lesson__stage">
               <img
                 src={TRAINING[g.trainingStep]!.art}
@@ -173,15 +162,16 @@ export function GameApp() {
               lines={TRAINING[g.trainingStep]!.lines}
               onDone={advanceTraining}
             />
-            {g.trainingStep > 0 ? (
+            <div className="training-lesson__skip">
               <button
                 type="button"
                 className="btn ghost"
-                onClick={() => g.setTrainingStep(g.trainingStep - 1)}
+                onClick={skipTraining}
+                onMouseEnter={() => audio.play("uiHover")}
               >
-                Back
+                Skip tutorial
               </button>
-            ) : null}
+            </div>
           </section>
         ) : null}
 
@@ -271,8 +261,8 @@ export function GameApp() {
         ) : null}
 
         {missionLive && g.state && g.weather ? (
-          use2d ? (
-            <PhaserPlay
+          depth ? (
+            <DepthWorldPlay
               state={g.state}
               weather={g.weather}
               event={g.todaysEvent}
@@ -295,7 +285,7 @@ export function GameApp() {
               onOpenGlossary={() => g.setGlossaryOpen(true)}
             />
           ) : (
-            <DepthWorldPlay
+            <PhaserPlay
               state={g.state}
               weather={g.weather}
               event={g.todaysEvent}

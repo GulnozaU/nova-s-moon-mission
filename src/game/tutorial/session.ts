@@ -31,8 +31,12 @@ export function getTutorial(): TutorialState {
   return tutorial;
 }
 
-export function advanceTutorial(action: TutorialStepId): boolean {
-  return tryAdvance(tutorial, action);
+/** Advance day-1 coach; returns the follow-up tip line when a step completed. */
+export function advanceTutorial(action: TutorialStepId): string | null {
+  const step = currentStep(tutorial);
+  const ok = tryAdvance(tutorial, action);
+  if (!ok) return null;
+  return step?.after ?? null;
 }
 
 export function isTutorialActive(): boolean {

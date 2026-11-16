@@ -291,7 +291,8 @@ export class IndoorScene extends Phaser.Scene {
             H * 0.48,
           );
           if (ok && bridge().getDecisions().recycler) {
-            advanceTutorial("water_cleaner");
+            const tip = advanceTutorial("water_cleaner");
+            if (tip) bridge().setNovaLine(tip);
           }
           return ok;
         },
@@ -386,7 +387,7 @@ export class IndoorScene extends Phaser.Scene {
           floatNumber(this, W * 0.46, H * 0.55, `💧−${GREENHOUSE_WATER}`, THEME.skyDeep);
           this.tryEnableGreenhouse(W, H);
           this.syncPlants();
-          advanceTutorial("greenhouse_water");
+          // Greenhouse taught after Day 1 via morning talk.
           this.afterJob();
           return true;
         },
@@ -524,7 +525,7 @@ export class IndoorScene extends Phaser.Scene {
           bridge().patchDecisions({ scienceLevel: next });
           sparkBurst(this, W * 0.5, H * 0.55, 0x7ec8ff);
           floatNumber(this, W * 0.5, H * 0.52, `🔬+${sciPts}`, THEME.sageInk);
-          advanceTutorial("lab_analyzer");
+          // Lab taught after Day 1 via morning talk.
           this.afterJob();
           return true;
         },
@@ -675,7 +676,8 @@ export class IndoorScene extends Phaser.Scene {
     this.ending = true;
     this.walkTarget = null;
     this.player.setVelocity(0, 0);
-    advanceTutorial("bed");
+    const tip = advanceTutorial("bed");
+    if (tip) bridge().setNovaLine(tip);
     // Persist storm crew shelter count into today's decisions.
     bridge().patchDecisions({
       shelteredCrewCount: countSheltered(getCrewShelter()),
@@ -770,8 +772,6 @@ export class IndoorScene extends Phaser.Scene {
       getTutorial(),
       {
         recycler: this.recyclerPos,
-        tap_water: this.traysPos,
-        analyzer: this.analyzerPos,
         bed: this.bedPos,
         home_door: this.exitDoor,
       },

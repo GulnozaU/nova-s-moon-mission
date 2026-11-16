@@ -342,8 +342,10 @@ export class BaseWorldScene extends Phaser.Scene {
         this.say("First, chip the radio — follow the arrow.");
         return;
       }
-      if (room === "home" && idx === 1) advanceTutorial("enter_home");
-      if (room === "home" && idx === 5) advanceTutorial("back_home");
+      if (room === "home" && idx === 1) {
+        const tip = advanceTutorial("enter_home");
+        if (tip) bridge().setNovaLine(tip);
+      }
     }
     this.doorCooldown = 500;
     audio.play("door");
@@ -429,7 +431,8 @@ export class BaseWorldScene extends Phaser.Scene {
             if (on) {
               audio.play("powerHum");
               floatNumber(this, W * 0.58, H * 0.7, "Radio ON", THEME.sageInk);
-              advanceTutorial("radio_chip");
+              const tip = advanceTutorial("radio_chip");
+              if (tip) bridge().setNovaLine(tip);
             }
             this.refreshWorldFx(false);
           }),

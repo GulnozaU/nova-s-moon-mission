@@ -144,6 +144,31 @@
   margin: 0 auto;
   padding: 0 0.75rem 2rem;
 }
+
+/* Soft pixel shell — chunkier UI, mild crisp images */
+.nova-app.soft-pixel {
+  --radius: 10px;
+}
+.nova-app.soft-pixel .btn {
+  border-radius: 10px;
+  box-shadow: 0 3px 0 rgba(58, 51, 72, 0.18);
+}
+.nova-app.soft-pixel .dialogue__box,
+.nova-app.soft-pixel .site-card,
+.nova-app.soft-pixel .panel {
+  border-radius: 12px;
+  border-width: 3px;
+}
+.nova-app.soft-pixel img.training-lesson__art,
+.nova-app.soft-pixel .dialogue__face,
+.nova-app.soft-pixel .brand img {
+  image-rendering: auto;
+}
+.training-lesson__skip {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
 .nova-foot {
   text-align: center;
   padding: 0.75rem;

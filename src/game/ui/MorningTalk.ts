@@ -15,7 +15,29 @@ export class MorningTalk {
   constructor(scene: Phaser.Scene) {
     if (!bridge().ready()) return;
     const day = bridge().getDay();
-    if (day <= 1) return;
+    // Day 1 uses the arrow coach; still offer a short chat if day > 1,
+    // and a tiny “what next” on day 1 after tutorial ends (coach handles first jobs).
+    if (day < 1) return;
+    if (day === 1) {
+      this.show(
+        scene,
+        clipWords("Day 1: I will walk you through three jobs."),
+        clipWords("Chip the radio, run the cleaner, then drag me to bed."),
+        [
+          {
+            id: "lets_go",
+            label: "Let's go",
+            hint: "Follow the bouncing arrow. Drag chips onto the radio.",
+          },
+          {
+            id: "skip_coach",
+            label: "I know this",
+            hint: "Explore rooms. Drag me to bed when you are done.",
+          },
+        ],
+      );
+      return;
+    }
     const talk = morningTalk(
       bridge().getState(),
       bridge().getEvent(),

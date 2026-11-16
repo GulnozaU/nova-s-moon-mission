@@ -1,5 +1,5 @@
 /**
- * Day-1 guided tutorial (Henry's Farm style).
+ * Day-1 guided tutorial (shorter) — step-by-step conversation in the world.
  * Advances only when the matching player action fires.
  */
 
@@ -7,9 +7,6 @@ export type TutorialStepId =
   | "radio_chip"
   | "enter_home"
   | "water_cleaner"
-  | "greenhouse_water"
-  | "lab_analyzer"
-  | "back_home"
   | "bed"
   | "done";
 
@@ -17,51 +14,40 @@ export type TutorialStep = {
   id: TutorialStepId;
   /** ≤25 words — shown as Nova's line. */
   line: string;
-  /** Where the bouncing arrow should point (scene-relative hint). */
-  target: "radio" | "home_door" | "recycler" | "tap_water" | "analyzer" | "bed" | "none";
+  /** Follow-up tip after the step (extra conversational beat). */
+  after?: string;
+  /** Where the bouncing arrow should point. */
+  target: "radio" | "home_door" | "recycler" | "bed" | "none";
   room: "surface" | "home" | "greenhouse" | "lab" | "any";
 };
 
+/** Three jobs + bed — greenhouse/lab taught on later morning talks. */
 export const DAY1_STEPS: TutorialStep[] = [
   {
     id: "radio_chip",
-    line: "Drag a yellow power chip onto the radio dish.",
+    line: "First job: drag a yellow chip onto the radio dish.",
+    after: "Good! Radio lets Mission Control warn us later.",
     target: "radio",
     room: "surface",
   },
   {
     id: "enter_home",
-    line: "Great! Walk into the Crew home door.",
+    line: "Next: walk into the Crew home door.",
+    after: "Home is where we run life support.",
     target: "home_door",
     room: "surface",
   },
   {
     id: "water_cleaner",
     line: "Drop chips on the water cleaner until it says ON.",
+    after: "Nice. Cleaner saves water every day it runs.",
     target: "recycler",
     room: "home",
   },
   {
-    id: "greenhouse_water",
-    line: "Exit, enter Greenhouse, and drag water onto the plant trays.",
-    target: "tap_water",
-    room: "greenhouse",
-  },
-  {
-    id: "lab_analyzer",
-    line: "Now the Lab — drop a chip on the sample analyzer.",
-    target: "analyzer",
-    room: "lab",
-  },
-  {
-    id: "back_home",
-    line: "Head back to Crew home when you are ready to sleep.",
-    target: "home_door",
-    room: "any",
-  },
-  {
     id: "bed",
-    line: "Drag Nova onto the bed to end Day 1.",
+    line: "Last: drag me onto the bunk to end Day 1.",
+    after: "Night falls — watch what changed, then a new day.",
     target: "bed",
     room: "home",
   },

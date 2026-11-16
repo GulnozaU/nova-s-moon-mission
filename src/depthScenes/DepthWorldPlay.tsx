@@ -91,7 +91,7 @@ const PLACES: PlaceId[] = ["surface", "home", "greenhouse", "lab"];
 
 /**
  * Persistent four-place depth-painting world with interactive objects.
- * Phaser 2D remains on `?mode=2d`.
+ * Default play is Phaser soft-pixel 2D. Depth world only via `?mode=depth`.
  */
 export function DepthWorldPlay(props: Props) {
   const {
