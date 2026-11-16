@@ -59,8 +59,8 @@ export class ChipTray {
         p.event.stopPropagation();
         this.drag.begin(
           { kind: "chip", amount: 1, sourceId: `chip-${index}` },
-          p.x,
-          p.y,
+          p.worldX,
+          p.worldY,
         );
       });
       this.bolts.push(bolt);
@@ -79,14 +79,13 @@ export class ChipTray {
     this.refresh(true);
   }
 
-  /** Greenhouse water. A drop in the left column, not a picture on the plants. */
+  /** Greenhouse water, beside the Energy title so it does not cover the bolts. */
   showWater(amount: number) {
     if (this.water) return;
     const drop = this.scene.add
-      .text(this.originX, this.originY + 78, "💧  water", {
+      .text(this.originX + 148, this.originY - 2, "💧", {
         fontFamily: THEME.font,
-        fontSize: "16px",
-        color: THEME.ink,
+        fontSize: "22px",
       })
       .setDepth(102)
       .setScrollFactor(0)
@@ -94,10 +93,9 @@ export class ChipTray {
     drop.on("pointerdown", (p: Phaser.Input.Pointer) => {
       if (!this.drag) return;
       p.event.stopPropagation();
-      this.drag.begin({ kind: "water", amount }, p.x, p.y, 0x3a7ca5);
+      this.drag.begin({ kind: "water", amount }, p.worldX, p.worldY, 0x3a7ca5);
     });
     this.water = drop;
-    this.meta.setY(this.originY + 104);
   }
 
   setDrag(drag: DragController) {

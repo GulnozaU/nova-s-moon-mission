@@ -422,12 +422,10 @@ export class IndoorScene extends Phaser.Scene {
   /** Lab rail button — opens the real NASA plant-study note. */
   private addNotesButton() {
     const btn = this.add
-      .text(10, 280, "Plant notes", {
-        fontFamily: THEME.fontDisplay,
+      .text(148, 280, "Plant notes", {
+        fontFamily: THEME.font,
         fontSize: "13px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 8, y: 6 },
+        color: THEME.sageInk,
       })
       .setDepth(101)
       .setScrollFactor(0)
