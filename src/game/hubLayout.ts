@@ -1,10 +1,12 @@
+import { RAIL_W, WORLD_H, WORLD_W } from "./ui/railLayout";
+
 /**
  * Soft-pixel hub UV layout for `moon-base-hub-pixel.jpg` (1024×571).
- * Positions are fractions of canvas width/height — retuned so doors sit on
- * the painted orange / green / blue doors and drop zones clear walk paths.
+ * Positions are fractions of the world frame (right of the side rail),
+ * retuned so doors sit on the painted orange / green / blue doors.
  *
- * UX rule: walk targets and drag pads live in the *foreground dirt strip*
- * (y ≈ 0.62–0.88), never over roofs — so drag/drop never fights building art.
+ * UX rule: drag pads live in the foreground dirt strip
+ * (y ≈ 0.62–0.88), never over roofs.
  */
 
 export type HubUv = { u: number; v: number };
@@ -38,10 +40,7 @@ export const HUB = {
   walkMaxV: 0.9,
 } as const;
 
-export function uvToWorld(
-  W: number,
-  H: number,
-  uv: HubUv,
-): { x: number; y: number } {
-  return { x: W * uv.u, y: H * uv.v };
+/** Map a hub fraction into the world frame (not the side rail). */
+export function uvToWorld(uv: HubUv): { x: number; y: number } {
+  return { x: RAIL_W + WORLD_W * uv.u, y: WORLD_H * uv.v };
 }

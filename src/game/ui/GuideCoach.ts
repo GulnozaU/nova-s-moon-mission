@@ -63,8 +63,9 @@ export class GuideCoach {
       this.hide();
       return;
     }
-    this.line.setText(clipWords(`Nova: ${step.line}`, 28));
-    this.line.setVisible(true);
+    // Instruction text stays in the left rail (Nova). The arrow only marks the glow.
+    this.line.setText(clipWords(step.line, 28));
+    this.line.setVisible(false);
 
     const inRoom =
       step.room === "any" ||

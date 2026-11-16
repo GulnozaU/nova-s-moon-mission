@@ -2,7 +2,6 @@ import Phaser from "phaser";
 import { bridge } from "../bridge";
 import { plannedPowerCost } from "../../ui/powerMath";
 import {
-  BATTERY_CAP,
   HEAT_COST,
   SCIENCE_SUCCESS_TARGET,
 } from "../../engine/constants";
@@ -22,23 +21,23 @@ export class ChipTray {
   private lastKey = "";
   private drag: DragController | null = null;
   private heldExtra = 0;
-  constructor(scene: Phaser.Scene, x = 10, y = 8) {
+  constructor(scene: Phaser.Scene, x = 10, y = 128) {
     this.root = scene.add.container(x, y).setDepth(100).setScrollFactor(0);
 
     const bg = scene.add
-      .rectangle(0, 0, 360, 78, 0xfff3c4, 0.98)
+      .rectangle(0, 0, 232, 100, 0xfff3c4, 0.98)
       .setOrigin(0, 0)
       .setStrokeStyle(3, THEME.line, 0.45);
     this.root.add(bg);
 
-    this.title = scene.add.text(10, 6, "POWER CHIPS — drag onto glowing jobs", {
+    this.title = scene.add.text(8, 4, "Yellow chips", {
       fontFamily: THEME.fontDisplay,
       fontSize: "13px",
       color: THEME.ink,
     });
     this.root.add(this.title);
 
-    this.hint = scene.add.text(10, 24, "Free chips glow · spent chips are dim", {
+    this.hint = scene.add.text(8, 20, "Drag a bright one onto a glow", {
       fontFamily: THEME.font,
       fontSize: "11px",
       color: THEME.inkSoft,
@@ -65,8 +64,10 @@ export class ChipTray {
         : "chipSoft";
 
     for (let i = 0; i < 16; i++) {
-      const cx = 18 + i * 22;
-      const cy = 54;
+      const col = i % 8;
+      const row = Math.floor(i / 8);
+      const cx = 16 + col * 26;
+      const cy = 42 + row * 22;
       const cell = scene.add
         .image(cx, cy, chipKey)
         .setDisplaySize(20, 20)
@@ -90,12 +91,11 @@ export class ChipTray {
       this.cellHit.push(zone);
     }
 
-    this.meta = scene.add.text(10, 82, "", {
+    this.meta = scene.add.text(8, 82, "", {
       fontFamily: THEME.font,
-      fontSize: "12px",
+      fontSize: "11px",
       color: THEME.ink,
-      backgroundColor: THEME.cream,
-      padding: { x: 6, y: 3 },
+      wordWrap: { width: 216 },
     });
     this.root.add(this.meta);
 
@@ -136,13 +136,11 @@ export class ChipTray {
     if (!force && key === this.lastKey) return;
     this.lastKey = key;
 
-    this.title.setText(
-      left > 0
-        ? `POWER CHIPS — ${left} free · drag onto glowing jobs`
-        : `POWER CHIPS — none free (heat −${HEAT_COST} already reserved)`,
-    );
+    this.title.setText(left > 0 ? `Chips · ${left} free` : `Chips · none free`);
     this.hint.setText(
-      `Day ${s.day}/10 · battery carry ≤${BATTERY_CAP} · tap a yellow chip`,
+      left > 0
+        ? `Day ${s.day}/10 · drag a yellow chip`
+        : `Day ${s.day}/10 · heat keeps −${HEAT_COST}`,
     );
 
     for (let i = 0; i < this.cells.length; i++) {
@@ -168,7 +166,7 @@ export class ChipTray {
     }
 
     this.meta.setText(
-      `Science ${s.science}/${SCIENCE_SUCCESS_TARGET} · 💧${s.water}  O₂${s.oxygen}  📦${s.materials}  bat ${s.battery}`,
+      `Sci ${s.science}/${SCIENCE_SUCCESS_TARGET}  💧${s.water}  O₂${s.oxygen}  📦${s.materials}  bat ${s.battery}`,
     );
   }
 }

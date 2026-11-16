@@ -2,14 +2,15 @@ import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
 import { BaseWorldScene } from "./scenes/BaseWorldScene";
 import { IndoorScene } from "./scenes/IndoorScene";
+import { RAIL_W, WORLD_H, WORLD_W } from "./ui/railLayout";
 
 /**
- * Compact 16:9 stage. Backing store uses devicePixelRatio for crispness
- * without changing world coordinates (avoids resize thrash).
+ * World painting stays 960×540. A left rail holds the reading
+ * so labels never cover the base. Backing store uses devicePixelRatio.
  */
 export function createMoonGame(parent: HTMLElement): Phaser.Game {
-  const width = 960;
-  const height = 540;
+  const width = RAIL_W + WORLD_W;
+  const height = WORLD_H;
   const dpr =
     typeof window !== "undefined"
       ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)

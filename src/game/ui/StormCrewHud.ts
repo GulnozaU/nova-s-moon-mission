@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { THEME } from "../theme";
 import type { DragController } from "../drag/DragController";
 import { audio } from "../../audio/audio";
+import { worldX } from "./railLayout";
 
 export type CrewId = "sam" | "mira" | "ana";
 
@@ -32,8 +33,7 @@ export class StormCrewHud {
     this.drag = drag;
     this.shelter = { ...shelter };
     this.onChange = onChange;
-    const { width: W } = scene.scale;
-    this.root = scene.add.container(W / 2, 108).setDepth(88).setScrollFactor(0);
+    this.root = scene.add.container(worldX(0.5), 28).setDepth(88).setScrollFactor(0);
 
     const title = scene.add
       .text(0, -28, "Storm! Drag crew into Home", {

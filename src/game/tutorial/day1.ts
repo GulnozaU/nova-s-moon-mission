@@ -24,14 +24,14 @@ export type TutorialStep = {
 export const DAY1_STEPS: TutorialStep[] = [
   {
     id: "radio_chip",
-    line: "Drag a yellow chip from the top tray onto the Radio dish.",
+    line: "Drag a yellow chip from the left tray onto the Radio glow.",
     after: "Radio ON — Mission Control can warn us before storms (−1 chip).",
     target: "radio",
     room: "surface",
   },
   {
     id: "enter_home",
-    line: "Tap Home (right menu) or the Home glow to go inside.",
+    line: "Tap Home on the left to go inside.",
     after: "Home is life support — cleaner and air maker live here.",
     target: "home_door",
     room: "surface",
@@ -45,7 +45,7 @@ export const DAY1_STEPS: TutorialStep[] = [
   },
   {
     id: "bed",
-    line: "Drag me (bottom-left) onto the bunk to end Day 1.",
+    line: "Drag me from the left panel onto the bunk to end Day 1.",
     after: "Night falls — watch water, O₂, and science change.",
     target: "bed",
     room: "home",

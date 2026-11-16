@@ -219,8 +219,7 @@ export function PhaserPlay({
       <div className="phaser-play__canvas" ref={hostRef} />
       {visible ? (
         <p className="phaser-play__hint">
-          Yellow chips top-left · Nova guides bottom-left · tap places · drag Nova
-          onto bunk to end day
+          Places, chips, and Nova stay on the left. Tap Home, Plants, or Lab to go inside.
         </p>
       ) : null}
     </section>

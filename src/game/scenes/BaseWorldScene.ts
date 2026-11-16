@@ -6,10 +6,8 @@ import {
   ensureSoftPadTexture,
   fadeSlideIn,
   floatNumber,
-  panelGlow,
   pulseDoorGlow,
   reduceMotion,
-  roverIdleBounce,
   shieldShimmer,
   sparkBurst,
   stormWarningPulse,
@@ -17,7 +15,9 @@ import {
 } from "../anim";
 import { HUB, HUB_ART_KEY, uvToWorld } from "../hubLayout";
 import { ChipTray } from "../ui/ChipTray";
+import { JobLegend } from "../ui/JobLegend";
 import { PlaceHud } from "../ui/PlaceHud";
+import { paintSideRail, WORLD_H, WORLD_W, worldX, worldY } from "../ui/railLayout";
 import { CrewTalk } from "../ui/CrewTalk";
 import { JobStation } from "../ui/JobStation";
 import { GuideCoach } from "../ui/GuideCoach";
@@ -65,8 +65,8 @@ export class BaseWorldScene extends Phaser.Scene {
   private drag!: DragController;
   private dishImg: Phaser.GameObjects.Image | null = null;
   private dishSpin: Phaser.Tweens.Tween | null = null;
-  private panelsImg: Phaser.GameObjects.Image | null = null;
   private chipTray!: ChipTray;
+  private legend!: JobLegend;
   private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
   private alertPulse: Phaser.Tweens.Tween | null = null;
@@ -95,13 +95,12 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   create() {
-    const { width: W, height: H } = this.scale;
     this.ending = false;
     this.doors = [];
     this.stations = [];
     this.fills = {};
     this.crateRoots = [];
-    this.doorCooldown = 400;
+    this.doorCooldown = 0;
     fadeSlideIn(this, false);
     this.drag = new DragController(this);
     ensureSoftPadTexture(this);
@@ -119,63 +118,49 @@ export class BaseWorldScene extends Phaser.Scene {
       /* */
     }
 
-    // Full-bleed soft-pixel hub painting (Gemini) — one composition, no stacked boxes.
+    // Painting fills the world frame. Reading stays on the left rail.
+    paintSideRail(this);
     this.cameras.main.setBackgroundColor(0x6a7a88);
     this.add
-      .image(W / 2, H / 2, HUB_ART_KEY)
-      .setDisplaySize(W, H)
+      .image(worldX(0.5), worldY(0.5), HUB_ART_KEY)
+      .setDisplaySize(WORLD_W, WORLD_H)
       .setDepth(0);
     if (night) {
-      this.add.rectangle(0, 0, W, H, 0x1a2030, 0.42).setOrigin(0).setDepth(1);
+      this.add
+        .rectangle(worldX(0), 0, WORLD_W, WORLD_H, 0x1a2030, 0.42)
+        .setOrigin(0)
+        .setDepth(1);
       const rng = createRng(seed);
       const stars: Phaser.GameObjects.Arc[] = [];
       for (let i = 0; i < 16; i++) {
         stars.push(
           this.add
-            .circle(rng() * W, rng() * H * 0.32, 1.1 + rng(), 0xffffff, 0.85)
+            .circle(worldX(rng()), worldY(rng() * 0.32), 1.1 + rng(), 0xffffff, 0.85)
             .setDepth(2),
         );
       }
       twinkleStars(this, stars);
     }
     this.add
-      .image(W * 0.07, H * 0.08, "earth")
+      .image(worldX(0.08), worldY(0.1), "earth")
       .setDisplaySize(44, 44)
       .setDepth(3)
       .setAlpha(0.92);
 
-    // Soft door footprints on painted doors — navigation without brown rectangles.
-    this.addDoorHotspot("home", "Home", HUB.homeDoor, 0xf0a070, W, H);
-    this.addDoorHotspot("greenhouse", "Plants", HUB.greenhouseDoor, 0x8fa887, W, H);
-    this.addDoorHotspot("lab", "Lab", HUB.labDoor, 0x7aa7c4, W, H);
+    // Soft door footprints — tap the painted door, or use Places on the left.
+    this.addDoorHotspot("home", HUB.homeDoor, 0xf0a070);
+    this.addDoorHotspot("greenhouse", HUB.greenhouseDoor, 0x8fa887);
+    this.addDoorHotspot("lab", HUB.labDoor, 0x7aa7c4);
 
-    // Living overlays only where motion sells the painting (not duplicate buildings).
-    const panelPos = uvToWorld(W, H, HUB.panels);
-    this.panelsImg = this.add
-      .image(panelPos.x, panelPos.y, "panels")
-      .setDisplaySize(78, 48)
-      .setAlpha(0.55)
-      .setDepth(7);
-    panelGlow(this, this.panelsImg, true);
-
-    const dishPos = uvToWorld(W, H, HUB.dish);
+    // Dish spins only after the radio is on. No extra panel cutout on the painting.
+    const dishPos = uvToWorld(HUB.dish);
     this.dishImg = this.add
       .image(dishPos.x, dishPos.y, "dish")
       .setDisplaySize(56, 56)
       .setAlpha(0.0)
       .setDepth(8);
 
-    const roverPos = uvToWorld(W, H, HUB.rover);
-    // Bounce a soft pad under the painted rover so drag targets feel alive.
-    const roverPad = this.add
-      .image(roverPos.x, roverPos.y + 10, "softPad")
-      .setDisplaySize(64, 28)
-      .setTint(0xe2b48a)
-      .setAlpha(0.45)
-      .setDepth(7);
-    roverIdleBounce(this, roverPad);
-
-    const home = uvToWorld(W, H, HUB.homeDoor);
+    const home = uvToWorld(HUB.homeDoor);
     this.shieldRing = this.add
       .image(home.x, home.y - 36, "softPad")
       .setDisplaySize(90, 48)
@@ -183,10 +168,10 @@ export class BaseWorldScene extends Phaser.Scene {
       .setAlpha(0.12)
       .setDepth(5);
 
-    this.buildOutdoorJobs(W, H);
-    this.buildMaterialCrates(W, H);
+    this.buildOutdoorJobs();
+    this.buildMaterialCrates();
 
-    this.chipTray = new ChipTray(this, 10, 10);
+    this.chipTray = new ChipTray(this);
     this.chipTray.setDrag(this.drag);
     this.guide = new NovaGuide(this, this.drag);
     if (bridge().ready()) resetTutorialForDay(bridge().getDay());
@@ -211,7 +196,11 @@ export class BaseWorldScene extends Phaser.Scene {
     new PlaceHud(
       this,
       [
-        { id: "surface", label: "Surface", go: () => this.guide.say("You are on the Surface. Drag chips onto Radio.") },
+        {
+          id: "surface",
+          label: "Surface",
+          go: () => this.guide.say("You are on the Surface. Drag chips onto the glows."),
+        },
         { id: "home", label: "Home", go: () => this.enterRoom("home") },
         { id: "greenhouse", label: "Plants", go: () => this.enterRoom("greenhouse") },
         { id: "lab", label: "Lab", go: () => this.enterRoom("lab") },
@@ -219,13 +208,16 @@ export class BaseWorldScene extends Phaser.Scene {
       "surface",
     );
 
+    this.legend = new JobLegend(this);
     this.alertText = this.add
-      .text(W / 2, 96, "", {
+      .text(worldX(0.5), 8, "", {
         fontFamily: THEME.fontDisplay,
         fontSize: "12px",
         color: "#fff8ef",
         backgroundColor: "#c98b7b",
         padding: { x: 8, y: 4 },
+        align: "center",
+        wordWrap: { width: WORLD_W - 48 },
       })
       .setOrigin(0.5, 0)
       .setDepth(82)
@@ -241,24 +233,22 @@ export class BaseWorldScene extends Phaser.Scene {
       this.chipTray.refresh(true);
       this.guide.syncFromBridge();
       this.syncShieldVisual(true);
+      this.syncLegend();
     });
   }
 
-  /** Soft glowing footprint — tap to enter (no walking). */
+  /** Soft glowing footprint on the painted door. Names live in the left Places list. */
   private addDoorHotspot(
     room: "home" | "greenhouse" | "lab",
-    label: string,
     uv: { u: number; v: number },
     tint: number,
-    W: number,
-    H: number,
   ) {
-    const { x, y } = uvToWorld(W, H, uv);
+    const { x, y } = uvToWorld(uv);
     const glow = this.add
       .image(x, y + 6, "softPad")
-      .setDisplaySize(78, 38)
+      .setDisplaySize(72, 28)
       .setTint(tint)
-      .setAlpha(0.6)
+      .setAlpha(0.45)
       .setDepth(9)
       .setInteractive({ useHandCursor: true });
     pulseDoorGlow(this, glow);
@@ -267,45 +257,27 @@ export class BaseWorldScene extends Phaser.Scene {
       this.enterRoom(room);
     });
     this.doorGlows.push(glow);
-    this.add
-      .text(x, y - 22, `Tap · ${label}`, {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "12px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 6, y: 2 },
-      })
-      .setOrigin(0.5)
-      .setDepth(25);
-    this.doors.push({ room, x, y, r: 34 });
+    this.doors.push({ room, x, y, r: 36 });
     if (room === "home") this.homeDoorPos = { x, y };
   }
 
   private enterRoom(room: "home" | "greenhouse" | "lab") {
     if (this.doorCooldown > 0 || this.ending) return;
-    if (isTutorialActive()) {
-      const idx = getTutorial().index;
-      // Block leaving surface before radio chip.
-      if (idx === 0) {
-        this.say("First, chip the radio — follow the arrow.");
-        return;
-      }
-      if (room === "home" && idx === 1) {
-        const tip = advanceTutorial("enter_home");
-        if (tip) bridge().setNovaLine(tip);
-      }
+    if (isTutorialActive() && room === "home") {
+      const tip = advanceTutorial("enter_home");
+      if (tip) bridge().setNovaLine(tip);
     }
     this.doorCooldown = 500;
     audio.play("door");
-    sparkBurst(this, this.scale.width * 0.5, this.scale.height * 0.55);
+    sparkBurst(this, worldX(0.5), worldY(0.55));
     this.cameras.main.fadeOut(120, 42, 34, 28);
     this.time.delayedCall(130, () => {
       this.scene.start("indoor", { room });
     });
   }
 
-  private buildMaterialCrates(W: number, H: number) {
-    const base = uvToWorld(W, H, HUB.crates);
+  private buildMaterialCrates() {
+    const base = uvToWorld(HUB.crates);
     for (let i = 0; i < 2; i++) {
       const c = this.add.container(base.x + i * 36, base.y).setDepth(16);
       const img = this.add
@@ -340,16 +312,16 @@ export class BaseWorldScene extends Phaser.Scene {
     }
   }
 
-  private buildOutdoorJobs(W: number, H: number) {
+  private buildOutdoorJobs() {
     const sciPts =
       bridge().ready() && bridge().getState().site === "plain"
         ? SCIENCE_POINTS_PLAIN
         : SCIENCE_POINTS_RIM;
 
-    const radio = uvToWorld(W, H, HUB.radio);
-    const rover = uvToWorld(W, H, HUB.rover);
-    const shield = uvToWorld(W, H, HUB.shield);
-    const home = uvToWorld(W, H, HUB.homeDoor);
+    const radio = uvToWorld(HUB.radio);
+    const rover = uvToWorld(HUB.rover);
+    const shield = uvToWorld(HUB.shield);
+    const home = uvToWorld(HUB.homeDoor);
 
     this.radioPos = radio;
     this.addStation(
@@ -362,9 +334,6 @@ export class BaseWorldScene extends Phaser.Scene {
         benefits: [{ icon: "📡", value: "warn" }],
         accept: "chip",
         chipCost: COMMS_COST,
-        artKey: "radioConsole",
-        artW: 52,
-        artH: 44,
         getOn: () => bridge().getDecisions().comms,
         getFill: () => this.fills.radio ?? 0,
         onDrop: (p) =>
@@ -542,6 +511,16 @@ export class BaseWorldScene extends Phaser.Scene {
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(true);
     for (const s of this.stations) s.refresh();
+    this.syncLegend();
+  }
+
+  private syncLegend() {
+    const lines: string[] = [];
+    for (const s of this.stations) {
+      const line = s.legendLine();
+      if (line) lines.push(line);
+    }
+    this.legend.show(lines.length ? lines : ["Tap a glow on the picture."]);
   }
 
   private say(msg: string) {
@@ -644,5 +623,6 @@ export class BaseWorldScene extends Phaser.Scene {
     this.chipTray.refresh(false);
     this.refreshWorldFx(false);
     this.guide.syncFromBridge();
+    this.syncLegend();
   }
 }

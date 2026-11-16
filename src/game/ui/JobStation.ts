@@ -121,6 +121,11 @@ export class JobStation {
     ];
     if (this.prop) kids.splice(1, 0, this.prop);
     this.root.add(kids);
+    // Names and costs live in the side rail so the painting stays clear.
+    this.label.setVisible(false);
+    this.costText.setVisible(false);
+    this.onBadge.setVisible(false);
+    this.fillText.setVisible(false);
 
     if (opts.workerKey && scene.textures.exists(opts.workerKey)) {
       this.worker = scene.add
@@ -132,6 +137,14 @@ export class JobStation {
     }
 
     this.refresh();
+  }
+
+  /** One line for the side rail: name, cost, and whether it is on. */
+  legendLine(): string | null {
+    if (!(this.opts.isAvailable?.() ?? true)) return null;
+    const on = this.opts.getOn();
+    const trade = formatCostsBenefits(this.opts.costs, this.opts.benefits);
+    return `${on ? "✓" : "·"} ${this.opts.label}${trade ? `  ${trade}` : ""}`;
   }
 
   accepts(payload: DragPayload): boolean {

@@ -28,7 +28,9 @@ import {
   stormImpactFx,
 } from "../anim";
 import { ChipTray } from "../ui/ChipTray";
+import { JobLegend } from "../ui/JobLegend";
 import { PlaceHud } from "../ui/PlaceHud";
+import { paintSideRail, WORLD_H, WORLD_W, worldX, worldY } from "../ui/railLayout";
 import { CrewTalk } from "../ui/CrewTalk";
 import { JobStation } from "../ui/JobStation";
 import { NasaFrame } from "../ui/NasaFrame";
@@ -71,6 +73,8 @@ export class IndoorScene extends Phaser.Scene {
   private clipboardOpen = false;
   private clipboardPanel: Phaser.GameObjects.Container | null = null;
   private coach: GuideCoach | null = null;
+  private legend!: JobLegend;
+  private sideNote = "";
   private recyclerPos = { x: 0, y: 0 };
   private bedPos = { x: 0, y: 0 };
 
@@ -92,42 +96,36 @@ export class IndoorScene extends Phaser.Scene {
   }
 
   create() {
-    const { width: W, height: H } = this.scale;
     fadeSlideIn(this, true);
     this.drag = new DragController(this);
     ensureSoftPadTexture(this);
     const bgKey =
       this.room === "home" ? "bunks" : this.room === "greenhouse" ? "greenhouseIn" : "labIn";
+    paintSideRail(this);
     this.cameras.main.setBackgroundColor(0x2a2218);
-    // Soft-pixel room: painting carries the place; light grade only (no flat floor slab).
-    this.add.image(W / 2, H / 2, bgKey).setDisplaySize(W, H).setDepth(0);
-    this.add.rectangle(0, 0, W, H, 0xfff8ef, 0.08).setOrigin(0).setDepth(1);
     this.add
-      .rectangle(0, H * 0.88, W, H * 0.12, 0x1a1410, 0.18)
+      .image(worldX(0.5), worldY(0.5), bgKey)
+      .setDisplaySize(WORLD_W, WORLD_H)
+      .setDepth(0);
+    this.add
+      .rectangle(worldX(0), 0, WORLD_W, WORLD_H, 0xfff8ef, 0.08)
+      .setOrigin(0)
+      .setDepth(1);
+    this.add
+      .rectangle(worldX(0), worldY(0.88), WORLD_W, WORLD_H * 0.12, 0x1a1410, 0.18)
       .setOrigin(0)
       .setDepth(2);
 
-    this.add
-      .text(W / 2, 8, roomTitle(this.room), {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "16px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 10, y: 4 },
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(60);
+    if (this.room === "home") this.buildHome();
+    if (this.room === "greenhouse") this.buildGreenhouse();
+    if (this.room === "lab") this.buildLab();
 
-    if (this.room === "home") this.buildHome(W, H);
-    if (this.room === "greenhouse") this.buildGreenhouse(W, H);
-    if (this.room === "lab") this.buildLab(W, H);
-
-    this.exitDoor = { x: W * 0.5, y: H * 0.9, r: 38 };
+    this.exitDoor = { x: worldX(0.5), y: worldY(0.9), r: 38 };
     const exitGlow = this.add
       .image(this.exitDoor.x, this.exitDoor.y, "softPad")
-      .setDisplaySize(96, 40)
+      .setDisplaySize(88, 28)
       .setTint(0xffe08a)
-      .setAlpha(0.65)
+      .setAlpha(0.45)
       .setDepth(12)
       .setInteractive({ useHandCursor: true });
     pulseDoorGlow(this, exitGlow);
@@ -135,18 +133,8 @@ export class IndoorScene extends Phaser.Scene {
       p.event.stopPropagation();
       this.leaveToSurface();
     });
-    this.add
-      .text(this.exitDoor.x, this.exitDoor.y - 22, "Tap · Surface", {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "12px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 6, y: 2 },
-      })
-      .setOrigin(0.5)
-      .setDepth(13);
 
-    this.chipTray = new ChipTray(this, 10, 10);
+    this.chipTray = new ChipTray(this);
     this.chipTray.setDrag(this.drag);
     this.guide = new NovaGuide(this, this.drag);
     const place = this.room as PlaceId;
@@ -155,6 +143,7 @@ export class IndoorScene extends Phaser.Scene {
       ? ({ isOpen: () => false } as CrewTalk)
       : new CrewTalk(this, place);
     this.coach = new GuideCoach(this);
+    this.legend = new JobLegend(this);
     new PlaceHud(
       this,
       [
@@ -167,15 +156,16 @@ export class IndoorScene extends Phaser.Scene {
     );
 
     if (this.room === "home") {
-      this.guide.say("Drag chips onto Water cleaner. Drag me onto the bunk to end the day.");
+      this.guide.say("Drag chips onto the glows. Drag me onto the bunk to end the day.");
     } else if (this.room === "greenhouse") {
-      this.guide.say("Drag water from Tap onto trays, then chip the Grow light. Watch O₂ + science.");
+      this.guide.say("Drag water from the bucket onto the trays, then chip the Grow light.");
     } else {
-      this.guide.say("Chip the analyzer for science. Tap the OSDR notes for a real plant study.");
+      this.guide.say("Chip the analyzer for science. Tap the notes board for a real plant study.");
     }
 
     this.chipTray.refresh(true);
     for (const s of this.stations) s.refresh();
+    this.syncLegend();
   }
 
   private jumpRoom(room: RoomId) {
@@ -201,13 +191,13 @@ export class IndoorScene extends Phaser.Scene {
     this.drag.register(station);
   }
 
-  private buildHome(W: number, H: number) {
+  private buildHome() {
     // Heat always on — display only
     this.addStation(
       new JobStation(this, {
         id: "heat",
-        x: W * 0.18,
-        y: H * 0.52,
+        x: worldX(0.18),
+        y: worldY(0.52),
         label: "Heat",
         costs: [{ icon: "⚡", value: -HEAT_COST }],
         benefits: [{ icon: "🌡", value: "safe" }],
@@ -223,13 +213,13 @@ export class IndoorScene extends Phaser.Scene {
       }),
     );
 
-    this.recyclerPos = { x: W * 0.38, y: H * 0.55 };
-    this.bedPos = { x: W * 0.78, y: H * 0.68 };
+    this.recyclerPos = { x: worldX(0.38), y: worldY(0.55) };
+    this.bedPos = { x: worldX(0.78), y: worldY(0.68) };
     this.addStation(
       new JobStation(this, {
         id: "recycler",
-        x: W * 0.38,
-        y: H * 0.55,
+        x: worldX(0.38),
+        y: worldY(0.55),
         label: "Water cleaner",
         costs: [{ icon: "⚡", value: -RECYCLER_COST }],
         benefits: [
@@ -252,8 +242,8 @@ export class IndoorScene extends Phaser.Scene {
             p.amount,
             "recycler",
             "waterTrickle",
-            W * 0.38,
-            H * 0.48,
+            worldX(0.38),
+            worldY(0.48),
           );
           if (ok && bridge().getDecisions().recycler) {
             const tip = advanceTutorial("water_cleaner");
@@ -270,8 +260,8 @@ export class IndoorScene extends Phaser.Scene {
     this.addStation(
       new JobStation(this, {
         id: "air",
-        x: W * 0.58,
-        y: H * 0.55,
+        x: worldX(0.58),
+        y: worldY(0.55),
         label: "Air maker",
         costs: [{ icon: "⚡", value: -OXYGEN_MAKER_COST }],
         benefits: [{ icon: "O₂", value: OXYGEN_MAKER_GAIN }],
@@ -283,15 +273,15 @@ export class IndoorScene extends Phaser.Scene {
         getOn: () => bridge().getDecisions().oxygenMaker,
         getFill: () => this.fills.air ?? 0,
         onDrop: (p) =>
-          this.fillChipJob("air", OXYGEN_MAKER_COST, p.amount, "oxygenMaker", "airHiss", W * 0.58, H * 0.48),
+          this.fillChipJob("air", OXYGEN_MAKER_COST, p.amount, "oxygenMaker", "airHiss", worldX(0.58), worldY(0.48)),
       }),
     );
 
     this.addStation(
       new JobStation(this, {
         id: "bed",
-        x: W * 0.78,
-        y: H * 0.68,
+        x: worldX(0.78),
+        y: worldY(0.68),
         label: "Bed — end day",
         costs: [{ icon: "😴", value: "" }],
         benefits: [{ icon: "→", value: "night" }],
@@ -309,22 +299,14 @@ export class IndoorScene extends Phaser.Scene {
     );
   }
 
-  private buildGreenhouse(W: number, H: number) {
+  private buildGreenhouse() {
+    this.sideNote = "Bucket: drag water onto the plant trays.";
     // Painting already shows plants — only soft drop pads + tap (no floating junk).
-    const tap = this.add.container(W * 0.18, H * 0.62).setDepth(16);
+    const tap = this.add.container(worldX(0.18), worldY(0.62)).setDepth(16);
     const spout = this.add
       .image(0, 0, this.textures.exists("bucketFull") ? "bucketFull" : "waterTap")
       .setDisplaySize(44, 52);
-    const tapLabel = this.add
-      .text(0, -34, "Tap", {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "11px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 4, y: 2 },
-      })
-      .setOrigin(0.5);
-    tap.add([spout, tapLabel]);
+    tap.add(spout);
     tap.setSize(48, 56);
     tap.setInteractive(new Phaser.Geom.Rectangle(-24, -32, 48, 60), Phaser.Geom.Rectangle.Contains);
     tap.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -335,8 +317,8 @@ export class IndoorScene extends Phaser.Scene {
     this.addStation(
       new JobStation(this, {
         id: "trays",
-        x: W * 0.46,
-        y: H * 0.62,
+        x: worldX(0.46),
+        y: worldY(0.62),
         label: "Plant trays",
         costs: [{ icon: "💧", value: -GREENHOUSE_WATER }],
         benefits: [{ icon: "🌱", value: "grow" }],
@@ -350,11 +332,11 @@ export class IndoorScene extends Phaser.Scene {
           }
           this.plantsWatered = true;
           audio.play("waterTrickle");
-          floatNumber(this, W * 0.46, H * 0.55, `💧−${GREENHOUSE_WATER}`, THEME.skyDeep);
+          floatNumber(this, worldX(0.46), worldY(0.55), `💧−${GREENHOUSE_WATER}`, THEME.skyDeep);
           this.guide.explainJob(
             `Trays watered (−${GREENHOUSE_WATER} water). Next: chip the Grow light for O₂ + science.`,
           );
-          this.tryEnableGreenhouse(W, H);
+          this.tryEnableGreenhouse();
           this.afterJob();
           return true;
         },
@@ -364,8 +346,8 @@ export class IndoorScene extends Phaser.Scene {
     this.addStation(
       new JobStation(this, {
         id: "light",
-        x: W * 0.72,
-        y: H * 0.58,
+        x: worldX(0.72),
+        y: worldY(0.58),
         label: "Grow light",
         costs: [{ icon: "⚡", value: -GREENHOUSE_COST }],
         benefits: [
@@ -386,7 +368,7 @@ export class IndoorScene extends Phaser.Scene {
           if (this.growLightOn) {
             this.growLightOn = false;
             bridge().patchDecisions({ greenhouse: false });
-            floatNumber(this, W * 0.72, H * 0.5, "Light off", THEME.inkSoft);
+            floatNumber(this, worldX(0.72), worldY(0.5), "Light off", THEME.inkSoft);
             this.guide.explainJob("Grow light OFF — no plant O₂ or science tonight.");
             this.afterJob();
             return true;
@@ -398,8 +380,8 @@ export class IndoorScene extends Phaser.Scene {
           this.growLightOn = true;
           bridge().patchDecisions({ greenhouse: true });
           audio.play("plantSparkle");
-          sparkBurst(this, W * 0.72, H * 0.52, 0xffe08a);
-          floatNumber(this, W * 0.72, H * 0.5, `O₂+${GREENHOUSE_OXYGEN} 🔬+${GREENHOUSE_SCIENCE}`, THEME.sageInk);
+          sparkBurst(this, worldX(0.72), worldY(0.52), 0xffe08a);
+          floatNumber(this, worldX(0.72), worldY(0.5), `O₂+${GREENHOUSE_OXYGEN} 🔬+${GREENHOUSE_SCIENCE}`, THEME.sageInk);
           this.guide.explainJob(
             `Grow light ON (−${GREENHOUSE_COST} chip). Effect tonight: O₂ +${GREENHOUSE_OXYGEN}, science +${GREENHOUSE_SCIENCE}.`,
           );
@@ -410,42 +392,26 @@ export class IndoorScene extends Phaser.Scene {
     );
   }
 
-  private tryEnableGreenhouse(W: number, H: number) {
+  private tryEnableGreenhouse() {
     if (this.plantsWatered && this.growLightOn) {
       bridge().patchDecisions({ greenhouse: true });
-      floatNumber(this, W * 0.5, H * 0.4, "Plants working!", THEME.sageInk);
+      floatNumber(this, worldX(0.5), worldY(0.4), "Plants working!", THEME.sageInk);
     }
   }
 
-  private buildLab(W: number, H: number) {
+  private buildLab() {
     const sciPts =
       bridge().ready() && bridge().getState().site === "plain"
         ? SCIENCE_POINTS_PLAIN
         : SCIENCE_POINTS_RIM;
 
-    // Wall screen — NASA storm picture + plain warning
-    new NasaFrame(this, W * 0.22, H * 0.42, true);
-    const brief = this.add
-      .text(W * 0.22, H * 0.58, "", {
-        fontFamily: THEME.font,
-        fontSize: "11px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 6, y: 4 },
-        align: "center",
-        wordWrap: { width: 170 },
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(56);
-    // Lab screen only warns if radio had chips yesterday (same rule as HUD alerts).
-    brief.setText(
-      bridge().getCommsYesterday()
-        ? bridge().getStormBrief() || "Radio was on — sky check clear for now."
-        : "No warning — radio had no chips yesterday.",
-    );
+    new NasaFrame(this, worldX(0.22), worldY(0.42), true);
+    this.sideNote = bridge().getCommsYesterday()
+      ? "Radio was on. Read the wall screen."
+      : "No warning — radio was off yesterday.";
 
     // OSDR clipboard — soft pad + label (painting carries the desk)
-    const clip = this.add.container(W * 0.78, H * 0.42).setDepth(56);
+    const clip = this.add.container(worldX(0.78), worldY(0.42)).setDepth(56);
     const board = this.add
       .image(0, 0, "softPad")
       .setDisplaySize(88, 56)
@@ -472,14 +438,14 @@ export class IndoorScene extends Phaser.Scene {
     clip.setInteractive(new Phaser.Geom.Rectangle(-50, -40, 100, 80), Phaser.Geom.Rectangle.Contains);
     clip.on("pointerdown", (p: Phaser.Input.Pointer) => {
       p.event.stopPropagation();
-      this.openOsdrClipboard(W, H);
+      this.openOsdrClipboard();
     });
 
     this.addStation(
       new JobStation(this, {
         id: "analyzer",
-        x: W * 0.5,
-        y: H * 0.62,
+        x: worldX(0.5),
+        y: worldY(0.62),
         label: "Sample analyzer",
         costs: [{ icon: "⚡", value: -SCIENCE_COST_PER_LEVEL }],
         benefits: [{ icon: "🔬", value: `+${sciPts}` }],
@@ -501,8 +467,8 @@ export class IndoorScene extends Phaser.Scene {
             return false;
           }
           bridge().patchDecisions({ scienceLevel: next });
-          sparkBurst(this, W * 0.5, H * 0.55, 0x7ec8ff);
-          floatNumber(this, W * 0.5, H * 0.52, `🔬+${sciPts}`, THEME.sageInk);
+          sparkBurst(this, worldX(0.5), worldY(0.55), 0x7ec8ff);
+          floatNumber(this, worldX(0.5), worldY(0.52), `🔬+${sciPts}`, THEME.sageInk);
           this.guide.explainJob(
             `Analyzer run (−1 chip). Effect tonight: science +${sciPts}.`,
           );
@@ -513,7 +479,7 @@ export class IndoorScene extends Phaser.Scene {
     );
   }
 
-  private openOsdrClipboard(W: number, H: number) {
+  private openOsdrClipboard() {
     if (this.clipboardOpen) {
       this.clipboardPanel?.destroy(true);
       this.clipboardPanel = null;
@@ -526,7 +492,7 @@ export class IndoorScene extends Phaser.Scene {
       listArchivedOsdrStudies()[0]!;
     const finding = study.finding;
     const note = "ISS and lab results may differ on the Moon.";
-    const panel = this.add.container(W / 2, H * 0.48).setDepth(120);
+    const panel = this.add.container(worldX(0.5), worldY(0.48)).setDepth(120);
     const bg = this.add
       .rectangle(0, 0, 420, 200, THEME.panel, 0.98)
       .setStrokeStyle(3, THEME.line, 0.35);
@@ -637,6 +603,17 @@ export class IndoorScene extends Phaser.Scene {
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(true);
     for (const s of this.stations) s.refresh();
+    this.syncLegend();
+  }
+
+  private syncLegend() {
+    const lines: string[] = [];
+    if (this.sideNote) lines.push(this.sideNote);
+    for (const s of this.stations) {
+      const line = s.legendLine();
+      if (line) lines.push(line);
+    }
+    this.legend.show(lines.length ? lines : ["Tap a glow on the picture."]);
   }
 
   private say(msg: string) {
@@ -686,6 +663,7 @@ export class IndoorScene extends Phaser.Scene {
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(false);
     this.guide.syncFromBridge();
+    this.syncLegend();
 
     const roomHint =
       this.room === "home"

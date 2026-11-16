@@ -7,6 +7,7 @@ import {
   markCrewMet,
   type PlaceId,
 } from "../crewLines";
+import { RAIL_W, worldX, worldY } from "./railLayout";
 
 /**
  * First-visit crew lines with tap-to-continue, plus a ? replay button.
@@ -27,8 +28,10 @@ export class CrewTalk {
   }
 
   private makeHelpButton() {
-    const { width: W } = this.scene.scale;
-    const c = this.scene.add.container(W - 28, this.scene.scale.height - 56).setDepth(85).setScrollFactor(0);
+    const c = this.scene.add
+      .container(worldX(0.96), worldY(0.08))
+      .setDepth(85)
+      .setScrollFactor(0);
     const bg = this.scene.add
       .circle(0, 0, 16, THEME.accent, 0.95)
       .setStrokeStyle(2, THEME.line, 0.25)
@@ -54,32 +57,35 @@ export class CrewTalk {
     const crew = CREW[this.place];
     this.lineIndex = 0;
     this.open = true;
-    const { width: W, height: H } = this.scene.scale;
+    const panelW = RAIL_W - 16;
 
-    this.panel = this.scene.add.container(W / 2, H - 100).setDepth(90).setScrollFactor(0);
+    this.panel = this.scene.add
+      .container(RAIL_W / 2, this.scene.scale.height * 0.56)
+      .setDepth(125)
+      .setScrollFactor(0);
     const bg = this.scene.add
-      .rectangle(0, 0, Math.min(520, W - 40), 88, THEME.panel, 0.98)
+      .rectangle(0, 0, panelW, 130, THEME.panel, 0.98)
       .setStrokeStyle(3, THEME.line, 0.2)
       .setInteractive();
     const name = this.scene.add
-      .text(-240, -30, crew.name, {
+      .text(0, -48, crew.name, {
         fontFamily: THEME.fontDisplay,
         fontSize: "14px",
         color: THEME.ink,
         fontStyle: "bold",
       })
-      .setOrigin(0, 0.5);
+      .setOrigin(0.5);
     const body = this.scene.add
-      .text(0, 2, crew.lines[0]!, {
+      .text(0, -6, crew.lines[0]!, {
         fontFamily: THEME.font,
-        fontSize: "14px",
+        fontSize: "13px",
         color: THEME.ink,
         align: "center",
-        wordWrap: { width: 480 },
+        wordWrap: { width: panelW - 20 },
       })
       .setOrigin(0.5);
     const tip = this.scene.add
-      .text(0, 32, "tap to continue", {
+      .text(0, 48, "tap to continue", {
         fontFamily: THEME.font,
         fontSize: "11px",
         color: THEME.inkSoft,
