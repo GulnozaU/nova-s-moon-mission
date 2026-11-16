@@ -82,6 +82,11 @@
   opacity: 1;
 }
 
+.world3d-chip.is-held {
+  outline: 2px solid #3a3348;
+  transform: translateY(-2px);
+}
+
 .world3d-chips__meta {
   margin: 6px 0 0;
   font-size: 12px;

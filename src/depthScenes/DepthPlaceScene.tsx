@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type ReactNode,
 } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -32,6 +33,9 @@ export type DepthPlaceSceneProps = {
   navigateTo: PlaceId | null;
   onReachedDoor: (to: PlaceId) => void;
   walkApiRef: MutableRefObject<WalkApi | null>;
+  /** Live Nova world position for USE-range checks. */
+  novaPosRef: MutableRefObject<THREE.Vector3>;
+  interactives?: ReactNode;
 };
 
 function DepthPainting({
@@ -266,6 +270,8 @@ export function DepthPlaceScene({
   navigateTo,
   onReachedDoor,
   walkApiRef,
+  novaPosRef,
+  interactives,
 }: DepthPlaceSceneProps) {
   const [w, d] = floor.worldSize;
   const aspectH = (w * floor.paintingSize[1]) / floor.paintingSize[0];
@@ -293,10 +299,11 @@ export function DepthPlaceScene({
       },
       getPosition: () => pos.current,
     };
+    novaPosRef.current.copy(pos.current);
     return () => {
       walkApiRef.current = null;
     };
-  }, [walkApiRef]);
+  }, [walkApiRef, novaPosRef]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -373,6 +380,7 @@ export function DepthPlaceScene({
         }
       }
     }
+    novaPosRef.current.copy(pos.current);
 
     if (doorCooldown.current > 0) return;
     const hit = nearDoor(pos.current.x, pos.current.z, floor);
@@ -438,6 +446,7 @@ export function DepthPlaceScene({
         moving={moving}
         yawSign={yawSign}
       />
+      {interactives}
     </>
   );
 }

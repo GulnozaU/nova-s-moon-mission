@@ -1,0 +1,156 @@
+.depth-tip {
+  min-width: 160px;
+  max-width: 240px;
+  padding: 8px 10px;
+  background: #fff8ef;
+  border: 2px solid rgba(58, 51, 72, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(58, 51, 72, 0.16);
+  font-family: Nunito, system-ui, sans-serif;
+  color: #3a3348;
+  text-align: left;
+}
+
+.depth-tip__title {
+  margin: 0 0 2px;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 14px;
+}
+
+.depth-tip__kind {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6a6278;
+}
+
+.depth-tip__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.depth-tip__cost,
+.depth-tip__benefit {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f0e6d8;
+}
+
+.depth-tip__cost {
+  background: #f3d4d0;
+}
+
+.depth-tip__benefit {
+  background: #d8eedc;
+}
+
+.depth-tip__info {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.depth-tip__badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #e8c96a;
+  color: #3a3348;
+}
+
+.depth-stage {
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 11px;
+  background: #fff8ef;
+  border: 1px solid rgba(58, 51, 72, 0.25);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #3a3348;
+}
+
+.depth-stage.is-wilt {
+  background: #f3d4d0;
+}
+
+.depth-tools {
+  position: absolute;
+  left: 10px;
+  bottom: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  z-index: 7;
+  pointer-events: auto;
+  max-width: min(520px, 70vw);
+}
+
+.depth-tools button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid rgba(58, 51, 72, 0.22);
+  background: #fff8ef;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 13px;
+  color: #3a3348;
+  cursor: grab;
+}
+
+.depth-tools button.is-held {
+  background: #e8c96a;
+  cursor: grabbing;
+}
+
+.depth-info-card {
+  position: absolute;
+  right: 10px;
+  bottom: 48px;
+  width: min(320px, 90vw);
+  background: #fff8ef;
+  border: 2px solid rgba(58, 51, 72, 0.22);
+  border-radius: 12px;
+  padding: 12px 14px;
+  z-index: 8;
+  font-family: Nunito, system-ui, sans-serif;
+  color: #3a3348;
+  box-shadow: 0 8px 22px rgba(58, 51, 72, 0.14);
+}
+
+.depth-info-card__badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #e8c96a;
+  margin-bottom: 6px;
+}
+
+.depth-info-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.depth-info-card button {
+  margin-top: 8px;
+  font-family: Nunito, sans-serif;
+  border: none;
+  background: transparent;
+  color: #6a6278;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.depth-storm-pic {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: block;
+}

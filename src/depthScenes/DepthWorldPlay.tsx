@@ -20,11 +20,16 @@ import { moonBridgeRef, type BridgeDelta, type PlayMode } from "../game/bridge";
 import { listArchivedOsdrStudies } from "../data/osdr";
 import { audio } from "../audio/audio";
 import { prefersReducedMotion } from "../world3d/reducedMotion";
+import { getNasaImage } from "../content/images";
 import { DepthPlaceScene } from "./DepthPlaceScene";
 import { getFloor } from "./places";
 import { PLACE_LABELS, type PlaceId } from "./types";
 import { uvToWorld } from "./math";
+import { InteractiveLayer } from "./interactives/InteractiveLayer";
+import { defaultPlaceFx } from "./interactives/actions";
+import type { DragPayload, PlaceFx } from "./interactives/types";
 import "../world3d/hud/WorldHud.css";
+import "./interactives/depthInteract.css";
 
 type Props = {
   state: GameState;
@@ -74,7 +79,7 @@ function stormBrief(event: Event | null, alerts: StormAlert[]): string {
 const PLACES: PlaceId[] = ["surface", "home", "greenhouse", "lab"];
 
 /**
- * Persistent four-place depth-painting world.
+ * Persistent four-place depth-painting world with interactive objects.
  * Phaser 2D remains on `?mode=2d`.
  */
 export function DepthWorldPlay(props: Props) {
@@ -103,20 +108,61 @@ export function DepthWorldPlay(props: Props) {
   const [place, setPlace] = useState<PlaceId>("surface");
   const [fading, setFading] = useState(false);
   const [fadeOn, setFadeOn] = useState(false);
-  /** Active auto-walk target (door toward this place). */
   const [navigateTo, setNavigateTo] = useState<PlaceId | null>(null);
-  /** Final HUD destination across multi-hop (e.g. home → surface → lab). */
   const hudDestRef = useRef<PlaceId | null>(null);
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const walkApiRef = useRef<WalkApi | null>(
     null,
   ) as MutableRefObject<WalkApi | null>;
+  const novaPosRef = useRef(new THREE.Vector3()) as MutableRefObject<THREE.Vector3>;
   const floor = getFloor(place);
+
+  const [fx, setFxState] = useState<PlaceFx>(defaultPlaceFx);
+  const [drag, setDrag] = useState<DragPayload | null>(null);
+  const [infoCard, setInfoCard] = useState<{
+    text: string;
+    badge?: string;
+    storm?: boolean;
+  } | null>(null);
+  const endingRef = useRef(false);
+
+  const setFx = useCallback(
+    (patch: Partial<PlaceFx> | ((p: PlaceFx) => PlaceFx)) => {
+      setFxState((prev) =>
+        typeof patch === "function" ? patch(prev) : { ...prev, ...patch },
+      );
+    },
+    [],
+  );
 
   const dpr = useMemo(() => {
     if (typeof window === "undefined") return 1;
     return Math.min(window.devicePixelRatio || 1, 2);
   }, []);
+
+  // Wilt plants that were watered but never lit after a while (visual only).
+  useEffect(() => {
+    if (place !== "greenhouse") return;
+    if (decisions.greenhouse || fx.growLightOn) return;
+    const t = window.setTimeout(() => {
+      setFx((prev) => ({
+        ...prev,
+        plantWilt: prev.plantStage.map((s) => s > 0 && s < 3) as PlaceFx["plantWilt"],
+      }));
+    }, 12000);
+    return () => window.clearTimeout(t);
+  }, [place, decisions.greenhouse, fx.growLightOn, fx.plantStage, setFx]);
+
+  // Rover returns after trip animation window.
+  useEffect(() => {
+    if (!fx.roverTrip) return;
+    const t = window.setTimeout(() => {
+      setFx({ roverTrip: false });
+      onNovaLine("Rover is back with samples for the lab.");
+      audio.play("success");
+    }, prefersReducedMotion() ? 400 : 2800);
+    return () => window.clearTimeout(t);
+  }, [fx.roverTrip, setFx, onNovaLine]);
 
   useEffect(() => {
     moonBridgeRef.current = {
@@ -128,7 +174,7 @@ export function DepthWorldPlay(props: Props) {
       getState: () => state,
       getEvent: () => event,
       getHint: () =>
-        "WASD or tap the floor. Walk through gold doors. Place icons auto-walk.",
+        "Hover objects · drag chips/water/crates · walk up to USE · bed ends day",
       getDeltas: () => deltas,
       getStormAlerts: () => stormAlerts,
       getTomorrowHint: () => tomorrowHint,
@@ -179,7 +225,6 @@ export function DepthWorldPlay(props: Props) {
     [place, fading],
   );
 
-  /** HUD: auto-walk toward door; multi-hop via surface when needed. */
   const requestPlace = useCallback(
     (next: PlaceId) => {
       if (next === place || fading) return;
@@ -197,8 +242,52 @@ export function DepthWorldPlay(props: Props) {
     [place, fading, floor],
   );
 
+  const patchDecisions = useCallback(
+    (patch: Partial<DayDecisions>) => {
+      onDecisions({ ...decisions, ...patch });
+    },
+    [decisions, onDecisions],
+  );
+
+  const finishDay = useCallback(() => {
+    if (endingRef.current) return;
+    endingRef.current = true;
+    audio.play("dayEnd");
+    onEndDay();
+    window.setTimeout(() => {
+      onContinueAfterResult();
+      endingRef.current = false;
+      setFx(defaultPlaceFx());
+      setDrag(null);
+      setPlace("surface");
+    }, 600);
+  }, [onEndDay, onContinueAfterResult, setFx]);
+
+  const showInfo = useCallback((text: string, badge?: string) => {
+    const storm = /storm|flare|CME|Sun/i.test(text);
+    setInfoCard({ text, badge, storm });
+  }, []);
+
   const spent = plannedPowerCost(decisions);
   const free = Math.max(0, powerToday - spent);
+  const stormImg = useMemo(() => getNasaImage("storm"), []);
+  const warningLine =
+    stormAlerts[0] != null
+      ? `Warning: about ${stormAlerts[0].warningDays} day(s). ${stormAlerts[0].message}`
+      : event?.eventDate
+        ? `NASA date ${event.eventDate.slice(0, 10)}.`
+        : "No CME warning clock yet — power the radio.";
+
+  const hold = (kind: DragPayload["kind"], amount: number, label: string) => {
+    if (drag?.kind === kind) {
+      setDrag(null);
+      audio.play("uiClick");
+      return;
+    }
+    setDrag({ kind, amount });
+    audio.play("pick");
+    onNovaLine(`Holding ${label}. Tap a glowing drop target.`);
+  };
 
   if (!visible) return null;
 
@@ -232,6 +321,26 @@ export function DepthWorldPlay(props: Props) {
             navigateTo={navigateTo}
             onReachedDoor={enterPlace}
             walkApiRef={walkApiRef}
+            novaPosRef={novaPosRef}
+            interactives={
+              <InteractiveLayer
+                place={place}
+                floor={floor}
+                decisions={decisions}
+                state={state}
+                powerToday={powerToday}
+                fx={fx}
+                setFx={setFx}
+                drag={drag}
+                setDrag={setDrag}
+                novaPosRef={novaPosRef}
+                onDecisions={patchDecisions}
+                onNovaLine={onNovaLine}
+                onInfo={showInfo}
+                onGoPlace={enterPlace}
+                onEndDay={finishDay}
+              />
+            }
           />
         </Suspense>
       </Canvas>
@@ -253,15 +362,33 @@ export function DepthWorldPlay(props: Props) {
           </p>
           <div className="world3d-chips__row">
             {Array.from({ length: Math.min(powerToday, 20) }, (_, i) => (
-              <span
+              <button
                 key={i}
-                className={`world3d-chip${i < free ? " is-free" : ""}`}
+                type="button"
+                className={`world3d-chip${i < free ? " is-free" : ""}${
+                  drag?.kind === "chip" && i < free ? " is-held" : ""
+                }`}
+                style={{
+                  border: "none",
+                  padding: 0,
+                  cursor: i < free ? "grab" : "default",
+                }}
+                disabled={i >= free}
+                aria-label={i < free ? "Drag power chip" : "Spent chip"}
+                onClick={() => {
+                  if (i < free) hold("chip", 1, "a power chip");
+                }}
               />
             ))}
           </div>
           <p className="world3d-chips__meta">
             Science {state.science}/{SCIENCE_SUCCESS_TARGET} · 💧{state.water} ·
-            O₂{state.oxygen}
+            O₂{state.oxygen} · 🛡️{state.shieldLevel}
+            {fx.waterHeld ? ` · drops ${fx.waterHeld}` : ""}
+            {fx.samplesHeld || fx.roverSamples
+              ? ` · samples ${fx.samplesHeld + fx.roverSamples}`
+              : ""}
+            {fx.materialsHeld ? ` · crates ${fx.materialsHeld}` : ""}
           </p>
         </div>
 
@@ -278,11 +405,85 @@ export function DepthWorldPlay(props: Props) {
           ))}
         </nav>
 
+        <div className="depth-tools" aria-label="Carry items">
+          <button
+            type="button"
+            className={drag?.kind === "water" ? "is-held" : ""}
+            onClick={() => hold("water", 1, "water drops")}
+          >
+            💧 Water {fx.waterHeld ? `(${fx.waterHeld})` : ""}
+          </button>
+          <button
+            type="button"
+            className={drag?.kind === "crate" ? "is-held" : ""}
+            onClick={() => {
+              if (fx.materialsHeld < 2) {
+                onNovaLine("Tap supply crates on the surface first.");
+                audio.play("uiClick");
+                return;
+              }
+              hold("crate", 2, "supply crates");
+            }}
+          >
+            📦 Crates
+          </button>
+          <button
+            type="button"
+            className={drag?.kind === "sample" ? "is-held" : ""}
+            onClick={() => {
+              if (fx.samplesHeld + fx.roverSamples < 1) {
+                onNovaLine("Get samples from the rover or lab rack.");
+                return;
+              }
+              hold("sample", 1, "a sample");
+            }}
+          >
+            🪨 Sample
+          </button>
+          <button
+            type="button"
+            className={drag?.kind === "nova" ? "is-held" : ""}
+            onClick={() => hold("nova", 1, "Nova")}
+          >
+            🧑‍🚀 Nova
+          </button>
+          <button
+            type="button"
+            className={drag?.kind === "crew" ? "is-held" : ""}
+            onClick={() => hold("crew", 1, "a crew member")}
+          >
+            👥 Crew
+          </button>
+        </div>
+
+        {infoCard ? (
+          <aside className="depth-info-card" role="dialog" aria-label="NASA info">
+            {infoCard.badge ? (
+              <span className="depth-info-card__badge">{infoCard.badge}</span>
+            ) : null}
+            {infoCard.storm ? (
+              <>
+                <img
+                  className="depth-storm-pic"
+                  src={stormImg.file}
+                  alt={stormImg.alt}
+                />
+                <p className="depth-info-card__badge">LIVE / ARCHIVED</p>
+                <p>{warningLine}</p>
+              </>
+            ) : null}
+            <p>{infoCard.text}</p>
+            <button type="button" onClick={() => setInfoCard(null)}>
+              Close
+            </button>
+          </aside>
+        ) : null}
+
         {novaLine ? <p className="world3d-nova">{novaLine}</p> : null}
 
         <p className="world3d-hint">
-          WASD / arrows or tap floor · gold doors · HUD auto-walks · ?mode=2d
-          old game
+          Hover for cost/benefit · drag chips onto machines · walk+tap USE ·
+          bunk ends day
         </p>
       </div>
     </section>
