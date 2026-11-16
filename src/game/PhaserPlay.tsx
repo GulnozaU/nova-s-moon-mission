@@ -219,8 +219,8 @@ export function PhaserPlay({
       <div className="phaser-play__canvas" ref={hostRef} />
       {visible ? (
         <p className="phaser-play__hint">
-          Talk with Nova each morning · drag chips onto jobs · four places · drag
-          Nova to bed · mute in the header
+          Yellow chips top-left · Nova guides bottom-left · tap places · drag Nova
+          onto bunk to end day
         </p>
       ) : null}
     </section>

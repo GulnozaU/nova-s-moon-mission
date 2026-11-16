@@ -2,14 +2,10 @@ import Phaser from "phaser";
 import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import { isDaylight } from "../../ui/teach/dayNight";
-import { applyMovement, makeKeys, type ControlKeys } from "../playerControls";
 import {
-  addShadow,
-  dustPuff,
   ensureSoftPadTexture,
   fadeSlideIn,
   floatNumber,
-  idleBreathe,
   panelGlow,
   pulseDoorGlow,
   reduceMotion,
@@ -18,7 +14,6 @@ import {
   sparkBurst,
   stormWarningPulse,
   twinkleStars,
-  walkHop,
 } from "../anim";
 import { HUB, HUB_ART_KEY, uvToWorld } from "../hubLayout";
 import { ChipTray } from "../ui/ChipTray";
@@ -27,6 +22,7 @@ import { CrewTalk } from "../ui/CrewTalk";
 import { JobStation } from "../ui/JobStation";
 import { GuideCoach } from "../ui/GuideCoach";
 import { MorningTalk } from "../ui/MorningTalk";
+import { NovaGuide } from "../ui/NovaGuide";
 import {
   StormCrewHud,
   countSheltered,
@@ -64,10 +60,6 @@ type Door = {
  * Compact Moon surface hub — drag chips/materials onto outdoor jobs.
  */
 export class BaseWorldScene extends Phaser.Scene {
-  private player!: Phaser.Physics.Arcade.Sprite;
-  private keys: ControlKeys | null = null;
-  private shadowSync!: () => void;
-  private walkSync!: () => void;
   private doors: Door[] = [];
   private stations: JobStation[] = [];
   private drag!: DragController;
@@ -78,18 +70,15 @@ export class BaseWorldScene extends Phaser.Scene {
   private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
   private alertPulse: Phaser.Tweens.Tween | null = null;
-  private novaBubble!: Phaser.GameObjects.Text;
+  private guide!: NovaGuide;
   private shieldRing: Phaser.GameObjects.Image | null = null;
   private crateRoots: Phaser.GameObjects.Container[] = [];
   private doorGlows: Phaser.GameObjects.Image[] = [];
-  private lastFootstep = 0;
   private lastDay = -1;
   private ending = false;
-  private walkTarget: { x: number; y: number } | null = null;
   private doorCooldown = 0;
   private lastComms: boolean | null = null;
   private lastShield = -1;
-  private spawnNear: string | null = null;
   private fills: Record<string, number> = {};
   private coach: GuideCoach | null = null;
   private morning: MorningTalk | null = null;
@@ -101,8 +90,8 @@ export class BaseWorldScene extends Phaser.Scene {
     super("base");
   }
 
-  init(data?: { spawnNear?: string }) {
-    this.spawnNear = data?.spawnNear ?? null;
+  init(_data?: { spawnNear?: string }) {
+    /* spawnNear unused — places are tap-to-enter now */
   }
 
   create() {
@@ -197,46 +186,10 @@ export class BaseWorldScene extends Phaser.Scene {
     this.buildOutdoorJobs(W, H);
     this.buildMaterialCrates(W, H);
 
-    const spawn = this.spawnPoint(W, H);
-    this.player = this.physics.add
-      .sprite(spawn.x, spawn.y, "nova")
-      .setDisplaySize(46, 60)
-      .setCollideWorldBounds(true)
-      .setDepth(20);
-    this.player.body!.setSize(22, 16);
-    this.player.body!.setOffset(14, 42);
-    this.physics.world.setBounds(
-      20,
-      H * HUB.walkMinV,
-      W - 40,
-      H * (HUB.walkMaxV - HUB.walkMinV),
-    );
-
-    const sh = addShadow(this, this.player, 40);
-    this.shadowSync = sh.sync;
-    idleBreathe(this, this.player);
-    this.walkSync = walkHop(this.player, (x, y) => {
-      dustPuff(this, x, y);
-      const now = this.time.now;
-      if (now - this.lastFootstep > 420) {
-        this.lastFootstep = now;
-        audio.play("footstep");
-      }
-    }).sync;
-
-    this.keys = makeKeys(this);
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (this.ending || this.crewTalk?.isOpen() || this.drag.dragging) return;
-      this.walkTarget = {
-        x: p.worldX,
-        y: Phaser.Math.Clamp(p.worldY, H * HUB.walkMinV, H * HUB.walkMaxV),
-      };
-    });
-
-    this.chipTray = new ChipTray(this);
+    this.chipTray = new ChipTray(this, 10, 10);
     this.chipTray.setDrag(this.drag);
+    this.guide = new NovaGuide(this, this.drag);
     if (bridge().ready()) resetTutorialForDay(bridge().getDay());
-    // Day-1 tutorial replaces first-visit chatter.
     this.crewTalk = isTutorialActive()
       ? ({ isOpen: () => false } as CrewTalk)
       : new CrewTalk(this, "surface");
@@ -258,16 +211,16 @@ export class BaseWorldScene extends Phaser.Scene {
     new PlaceHud(
       this,
       [
-        { id: "surface", label: "Surface", go: () => (this.walkTarget = { x: W * 0.5, y: H * 0.72 }) },
-        { id: "home", label: "Home", go: () => this.goPlace("home") },
-        { id: "greenhouse", label: "Plants", go: () => this.goPlace("greenhouse") },
-        { id: "lab", label: "Lab", go: () => this.goPlace("lab") },
+        { id: "surface", label: "Surface", go: () => this.guide.say("You are on the Surface. Drag chips onto Radio.") },
+        { id: "home", label: "Home", go: () => this.enterRoom("home") },
+        { id: "greenhouse", label: "Plants", go: () => this.enterRoom("greenhouse") },
+        { id: "lab", label: "Lab", go: () => this.enterRoom("lab") },
       ],
       "surface",
     );
 
     this.alertText = this.add
-      .text(W / 2, 78, "", {
+      .text(W / 2, 96, "", {
         fontFamily: THEME.fontDisplay,
         fontSize: "12px",
         color: "#fff8ef",
@@ -279,20 +232,6 @@ export class BaseWorldScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setVisible(false);
 
-    this.novaBubble = this.add
-      .text(W / 2, H - 10, "", {
-        fontFamily: THEME.font,
-        fontSize: "12px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 8, y: 5 },
-        align: "center",
-        wordWrap: { width: W - 36 },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(82)
-      .setScrollFactor(0);
-
     this.time.delayedCall(80, () => {
       if (!bridge().ready()) return;
       this.lastDay = bridge().getDay();
@@ -300,30 +239,12 @@ export class BaseWorldScene extends Phaser.Scene {
       this.refreshAlerts();
       this.refreshWorldFx(true);
       this.chipTray.refresh(true);
-      const line = bridge().getNovaLine();
-      if (line) this.novaBubble.setText(line);
+      this.guide.syncFromBridge();
       this.syncShieldVisual(true);
     });
   }
 
-  private spawnPoint(W: number, H: number) {
-    if (this.spawnNear === "home") return uvToWorld(W, H, { u: HUB.homeDoor.u, v: 0.78 });
-    if (this.spawnNear === "greenhouse")
-      return uvToWorld(W, H, { u: HUB.greenhouseDoor.u, v: 0.8 });
-    if (this.spawnNear === "lab") return uvToWorld(W, H, { u: HUB.labDoor.u, v: 0.78 });
-    return uvToWorld(W, H, HUB.spawn);
-  }
-
-  private goPlace(room: "home" | "greenhouse" | "lab") {
-    const d = this.doors.find((x) => x.room === room);
-    if (!d) {
-      this.enterRoom(room);
-      return;
-    }
-    this.walkTarget = { x: d.x, y: d.y };
-  }
-
-  /** Soft glowing footprint on a painted door — walk into it to enter. */
+  /** Soft glowing footprint — tap to enter (no walking). */
   private addDoorHotspot(
     room: "home" | "greenhouse" | "lab",
     label: string,
@@ -335,14 +256,19 @@ export class BaseWorldScene extends Phaser.Scene {
     const { x, y } = uvToWorld(W, H, uv);
     const glow = this.add
       .image(x, y + 6, "softPad")
-      .setDisplaySize(72, 34)
+      .setDisplaySize(78, 38)
       .setTint(tint)
-      .setAlpha(0.55)
-      .setDepth(9);
+      .setAlpha(0.6)
+      .setDepth(9)
+      .setInteractive({ useHandCursor: true });
     pulseDoorGlow(this, glow);
+    glow.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      p.event.stopPropagation();
+      this.enterRoom(room);
+    });
     this.doorGlows.push(glow);
     this.add
-      .text(x, y - 22, label, {
+      .text(x, y - 22, `Tap · ${label}`, {
         fontFamily: THEME.fontDisplay,
         fontSize: "12px",
         color: THEME.ink,
@@ -371,7 +297,7 @@ export class BaseWorldScene extends Phaser.Scene {
     }
     this.doorCooldown = 500;
     audio.play("door");
-    sparkBurst(this, this.player.x, this.player.y - 10);
+    sparkBurst(this, this.scale.width * 0.5, this.scale.height * 0.55);
     this.cameras.main.fadeOut(120, 42, 34, 28);
     this.time.delayedCall(130, () => {
       this.scene.start("indoor", { room });
@@ -448,7 +374,12 @@ export class BaseWorldScene extends Phaser.Scene {
               audio.play("powerHum");
               floatNumber(this, radio.x, radio.y - 40, "Radio ON", THEME.sageInk);
               const tip = advanceTutorial("radio_chip");
-              if (tip) bridge().setNovaLine(tip);
+              this.guide.explainJob(
+                tip ??
+                  `Radio ON (−${COMMS_COST} chip). Effect: storm warnings if a flare is coming.`,
+              );
+            } else {
+              this.guide.explainJob("Radio OFF — no storm warning tomorrow.");
             }
             this.refreshWorldFx(false);
           }),
@@ -468,7 +399,6 @@ export class BaseWorldScene extends Phaser.Scene {
         benefits: [{ icon: "🔬", value: `+${sciPts}` }],
         accept: "chip",
         chipCost: 1,
-        // Pad only — painting already has the rover (no stacked cutout).
         getOn: () => bridge().getDecisions().scienceLevel > 0,
         onDrop: () => {
           const d = bridge().getDecisions();
@@ -478,13 +408,17 @@ export class BaseWorldScene extends Phaser.Scene {
             return false;
           }
           if (plannedPowerCost({ ...d, scienceLevel: next }) > bridge().getPowerToday()) {
-            this.say("Not enough power chips.");
+            this.say("Not enough free chips — check the yellow tray.");
             return false;
           }
           bridge().patchDecisions({ scienceLevel: next });
-          floatNumber(this, rover.x, rover.y - 36, `+1 walk · risk`, THEME.rose);
+          floatNumber(this, rover.x, rover.y - 36, `🔬+${sciPts}`, THEME.sageInk);
           const storm = bridge().getEvent()?.stormSeverity !== undefined;
-          if (storm) floatNumber(this, rover.x, rover.y - 54, "storm exposure!", THEME.rose);
+          this.guide.explainJob(
+            storm
+              ? `Science walk: +${sciPts} science, −1 chip, MORE storm risk tonight.`
+              : `Science walk: +${sciPts} science tonight, −1 chip. Extra risk if a storm hits.`,
+          );
           this.afterJob();
           return true;
         },
@@ -514,6 +448,9 @@ export class BaseWorldScene extends Phaser.Scene {
           bridge().patchDecisions({ buildShield: true });
           shieldShimmer(this, home.x, home.y - 20, (bridge().getState().shieldLevel || 0) + 1);
           floatNumber(this, shield.x, shield.y - 36, "Shield +1 tonight", THEME.sageInk);
+          this.guide.explainJob(
+            `Shield queued (−${SHIELD_MATERIAL_COST} parts). Effect: less storm risk tonight.`,
+          );
           this.syncShieldVisual(true);
           this.afterJob();
           return true;
@@ -608,8 +545,7 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   private say(msg: string) {
-    bridge().setNovaLine(msg);
-    this.novaBubble.setText(msg);
+    this.guide.say(msg);
   }
 
   private syncShieldVisual(force: boolean) {
@@ -682,7 +618,7 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   update(_t: number, dt: number) {
-    if (!this.player?.body || !bridge().ready()) return;
+    if (!bridge().ready()) return;
     if (this.doorCooldown > 0) this.doorCooldown -= dt;
 
     const day = bridge().getDay();
@@ -691,17 +627,7 @@ export class BaseWorldScene extends Phaser.Scene {
       return;
     }
 
-    if (
-      this.ending ||
-      this.crewTalk?.isOpen() ||
-      this.morning?.isOpen() ||
-      this.drag.dragging
-    ) {
-      this.player.setVelocity(0, 0);
-      if (this.drag.dragging) {
-        this.shadowSync?.();
-        return;
-      }
+    if (this.ending || this.crewTalk?.isOpen() || this.morning?.isOpen()) {
       return;
     }
 
@@ -714,57 +640,9 @@ export class BaseWorldScene extends Phaser.Scene {
       "surface",
     );
 
-    // Nova drag for shelter
-    if (!this.player.input) {
-      this.player.setInteractive({ useHandCursor: true });
-      this.player.on("pointerdown", (p: Phaser.Input.Pointer) => {
-        if (bridge().getEvent()?.stormSeverity === undefined) return;
-        p.event.stopPropagation();
-        this.drag.begin({ kind: "nova", amount: 1 }, p.worldX, p.worldY);
-      });
-    }
-
-    let pad = { x: 0, y: 0 };
-    if (this.walkTarget) {
-      const dx = this.walkTarget.x - this.player.x;
-      const dy = this.walkTarget.y - this.player.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 10) this.walkTarget = null;
-      else pad = { x: dx / dist, y: dy / dist };
-    }
-    if (this.keys) {
-      const k = this.keys;
-      if (
-        k.cursors.left.isDown ||
-        k.cursors.right.isDown ||
-        k.cursors.up.isDown ||
-        k.cursors.down.isDown ||
-        k.wasd.left.isDown ||
-        k.wasd.right.isDown ||
-        k.wasd.up.isDown ||
-        k.wasd.down.isDown
-      ) {
-        this.walkTarget = null;
-        pad = { x: 0, y: 0 };
-      }
-    }
-    applyMovement(this.player, this.keys, pad);
-    this.shadowSync?.();
-    this.walkSync?.();
-
-    if (this.doorCooldown <= 0) {
-      for (const d of this.doors) {
-        if (Phaser.Math.Distance.Between(this.player.x, this.player.y, d.x, d.y) < d.r) {
-          this.enterRoom(d.room);
-          break;
-        }
-      }
-    }
-
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(false);
     this.refreshWorldFx(false);
-    const line = bridge().getNovaLine();
-    if (line && this.novaBubble.text !== line) this.novaBubble.setText(line);
+    this.guide.syncFromBridge();
   }
 }

@@ -167,7 +167,13 @@ export class JobStation {
     if (!on && need > 1) {
       this.fillText.setText(`${fill}/${need} chips`);
     } else if (!on && need === 1 && this.accept.includes("chip")) {
-      this.fillText.setText("drop chip");
+      this.fillText.setText("↓ DROP CHIP HERE");
+    } else if (!on && this.accept.includes("water")) {
+      this.fillText.setText("↓ DROP WATER HERE");
+    } else if (!on && this.accept.includes("nova")) {
+      this.fillText.setText("↓ DROP NOVA HERE");
+    } else if (!on && this.accept.includes("material")) {
+      this.fillText.setText("↓ DROP PARTS HERE");
     } else {
       this.fillText.setText("");
     }

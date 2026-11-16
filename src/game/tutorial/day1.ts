@@ -1,6 +1,5 @@
 /**
- * Day-1 guided tutorial (shorter) — step-by-step conversation in the world.
- * Advances only when the matching player action fires.
+ * Day-1 guided tutorial — Nova talks from the corner; player taps places + drags chips.
  */
 
 export type TutorialStepId =
@@ -25,29 +24,29 @@ export type TutorialStep = {
 export const DAY1_STEPS: TutorialStep[] = [
   {
     id: "radio_chip",
-    line: "First job: drag a yellow chip onto the radio dish.",
-    after: "Good! Radio lets Mission Control warn us later.",
+    line: "Drag a yellow chip from the top tray onto the Radio dish.",
+    after: "Radio ON — Mission Control can warn us before storms (−1 chip).",
     target: "radio",
     room: "surface",
   },
   {
     id: "enter_home",
-    line: "Next: walk into the Crew home door.",
-    after: "Home is where we run life support.",
+    line: "Tap Home (right menu) or the Home glow to go inside.",
+    after: "Home is life support — cleaner and air maker live here.",
     target: "home_door",
     room: "surface",
   },
   {
     id: "water_cleaner",
-    line: "Drop chips on the water cleaner until it says ON.",
-    after: "Nice. Cleaner saves water every day it runs.",
+    line: "Drag chips onto the Water cleaner until it says ON.",
+    after: "Cleaner ON — saves water every day it runs (−2 chips).",
     target: "recycler",
     room: "home",
   },
   {
     id: "bed",
-    line: "Last: drag me onto the bunk to end Day 1.",
-    after: "Night falls — watch what changed, then a new day.",
+    line: "Drag me (bottom-left) onto the bunk to end Day 1.",
+    after: "Night falls — watch water, O₂, and science change.",
     target: "bed",
     room: "home",
   },

@@ -21,18 +21,18 @@ export class MorningTalk {
     if (day === 1) {
       this.show(
         scene,
-        clipWords("Day 1: I will walk you through three jobs."),
-        clipWords("Chip the radio, run the cleaner, then drag me to bed."),
+        clipWords("Day 1: I stay here and guide you."),
+        clipWords("Drag yellow chips onto jobs. Tap Home / Plants / Lab. Ask me which plan."),
         [
           {
             id: "lets_go",
-            label: "Let's go",
-            hint: "Follow the bouncing arrow. Drag chips onto the radio.",
+            label: "Guide me",
+            hint: "Drag a yellow chip onto the Radio dish. I will say what it costs and what you get.",
           },
           {
             id: "skip_coach",
             label: "I know this",
-            hint: "Explore rooms. Drag me to bed when you are done.",
+            hint: "Tap places on the right. Drag me onto the bunk in Home to end the day.",
           },
         ],
       );
