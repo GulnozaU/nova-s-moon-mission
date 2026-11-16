@@ -154,3 +154,187 @@
   margin-bottom: 8px;
   display: block;
 }
+
+.depth-consequence {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(26, 20, 16, 0.78);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.depth-consequence__title,
+.depth-consequence__nova {
+  margin: 0;
+  max-width: 420px;
+  text-align: center;
+  font-family: Nunito, system-ui, sans-serif;
+  font-size: 16px;
+  color: #fff8ef;
+  line-height: 1.35;
+}
+
+.depth-consequence__floats {
+  display: flex;
+  gap: 16px;
+  min-height: 40px;
+}
+
+.depth-consequence__float {
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 22px;
+  color: #d8eedc;
+  animation: depth-float-up 0.8s ease-out both;
+}
+
+@keyframes depth-float-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.depth-consequence__icons {
+  display: flex;
+  gap: 28px;
+}
+
+.depth-consequence__icon {
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 20px;
+  color: #fff8ef;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.depth-briefing {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  width: min(480px, 92vw);
+  background: #fff8ef;
+  border: 3px solid rgba(58, 51, 72, 0.22);
+  border-radius: 14px;
+  padding: 16px 18px;
+  text-align: center;
+  font-family: Nunito, system-ui, sans-serif;
+  color: #3a3348;
+  box-shadow: 0 12px 32px rgba(58, 51, 72, 0.18);
+}
+
+.depth-briefing__goal {
+  margin: 0 0 8px;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 16px;
+}
+
+.depth-briefing__story,
+.depth-briefing__ask {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6a6278;
+}
+
+.depth-briefing__choices {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.depth-briefing__choices button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #ffe08a;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 14px;
+  color: #3a3348;
+  cursor: pointer;
+}
+
+.depth-storm-crew {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.depth-storm-crew__title {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #c98b7b;
+  color: #fff8ef;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 12px;
+}
+
+.depth-storm-crew__row {
+  display: flex;
+  gap: 10px;
+}
+
+.depth-storm-crew button {
+  width: 52px;
+  height: 56px;
+  border-radius: 12px;
+  border: 2px solid rgba(58, 51, 72, 0.25);
+  background: #fff8ef;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 12px;
+  cursor: grab;
+  color: #3a3348;
+}
+
+.depth-storm-crew button.is-in {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.depth-storm-crew button.is-held {
+  outline: 2px solid #3a3348;
+}
+
+.depth-drag-ghost {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  width: 28px;
+  height: 36px;
+  border-radius: 4px;
+  background: #e8c96a;
+  border: 2px solid #3a3348;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.depth-fill-pip {
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 11px;
+  background: #fff8ef;
+  border-radius: 6px;
+  padding: 1px 5px;
+  border: 1px solid rgba(58, 51, 72, 0.2);
+}

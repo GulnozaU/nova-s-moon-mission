@@ -14,7 +14,8 @@ export const INTERACTIVES: InteractiveDef[] = [
     scale: 1.1,
     cutout: `${CUT}/habitat-dome.png`,
     useRadius: 1.6,
-    costBenefit: { costs: [], benefits: ["Enter home"] },
+    accepts: ["crew", "nova"],
+    costBenefit: { costs: [], benefits: ["Enter home", "🛡️ shelter"] },
     sfx: "door",
   },
   {

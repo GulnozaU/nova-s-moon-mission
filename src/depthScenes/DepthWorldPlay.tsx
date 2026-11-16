@@ -15,21 +15,30 @@ import type { SpaceWeatherResult } from "../data/donkiTypes";
 import type { OsdrStudy } from "../data/osdrTypes";
 import type { StormAlert } from "../content/schedule";
 import { plannedPowerCost } from "../ui/powerMath";
-import { SCIENCE_SUCCESS_TARGET } from "../engine/constants";
+import { BATTERY_CAP, SCIENCE_SUCCESS_TARGET } from "../engine/constants";
 import { moonBridgeRef, type BridgeDelta, type PlayMode } from "../game/bridge";
 import { listArchivedOsdrStudies } from "../data/osdr";
 import { audio } from "../audio/audio";
 import { prefersReducedMotion } from "../world3d/reducedMotion";
 import { getNasaImage } from "../content/images";
+import { clipWords } from "../game/novaTalk";
 import { DepthPlaceScene } from "./DepthPlaceScene";
 import { getFloor } from "./places";
 import { PLACE_LABELS, type PlaceId } from "./types";
 import { uvToWorld } from "./math";
 import { InteractiveLayer } from "./interactives/InteractiveLayer";
-import { defaultPlaceFx } from "./interactives/actions";
-import type { DragPayload, PlaceFx } from "./interactives/types";
+import { defaultPlaceFx, freePower } from "./interactives/actions";
+import type { CrewId, DragPayload, PlaceFx } from "./interactives/types";
+import { ConsequenceScene } from "./ConsequenceScene";
+import { MorningBriefing } from "./MorningBriefing";
 import "../world3d/hud/WorldHud.css";
 import "./interactives/depthInteract.css";
+
+const CREW: { id: CrewId; name: string }[] = [
+  { id: "sam", name: "Sam" },
+  { id: "mira", name: "Mira" },
+  { id: "ana", name: "Ana" },
+];
 
 type Props = {
   state: GameState;
@@ -124,7 +133,10 @@ export function DepthWorldPlay(props: Props) {
     badge?: string;
     storm?: boolean;
   } | null>(null);
+  const [consequence, setConsequence] = useState<BridgeDelta[] | null>(null);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   const endingRef = useRef(false);
+  const stormToday = event?.stormSeverity !== undefined;
 
   const setFx = useCallback(
     (patch: Partial<PlaceFx> | ((p: PlaceFx) => PlaceFx)) => {
@@ -152,6 +164,10 @@ export function DepthWorldPlay(props: Props) {
     }, 12000);
     return () => window.clearTimeout(t);
   }, [place, decisions.greenhouse, fx.growLightOn, fx.plantStage, setFx]);
+
+  useEffect(() => {
+    if (!drag) setGhost(null);
+  }, [drag]);
 
   // Rover returns after trip animation window.
   useEffect(() => {
@@ -250,18 +266,23 @@ export function DepthWorldPlay(props: Props) {
   );
 
   const finishDay = useCallback(() => {
-    if (endingRef.current) return;
+    if (endingRef.current || consequence) return;
     endingRef.current = true;
     audio.play("dayEnd");
-    onEndDay();
-    window.setTimeout(() => {
-      onContinueAfterResult();
-      endingRef.current = false;
-      setFx(defaultPlaceFx());
-      setDrag(null);
-      setPlace("surface");
-    }, 600);
-  }, [onEndDay, onContinueAfterResult, setFx]);
+    const nextDeltas = onEndDay();
+    setConsequence(nextDeltas);
+    setDrag(null);
+    setGhost(null);
+  }, [onEndDay, consequence]);
+
+  const afterConsequence = useCallback(() => {
+    setConsequence(null);
+    onContinueAfterResult();
+    endingRef.current = false;
+    setFx(defaultPlaceFx());
+    setDrag(null);
+    setPlace("surface");
+  }, [onContinueAfterResult, setFx]);
 
   const showInfo = useCallback((text: string, badge?: string) => {
     const storm = /storm|flare|CME|Sun/i.test(text);
@@ -269,7 +290,7 @@ export function DepthWorldPlay(props: Props) {
   }, []);
 
   const spent = plannedPowerCost(decisions);
-  const free = Math.max(0, powerToday - spent);
+  const free = freePower(decisions, powerToday, fx.fills);
   const stormImg = useMemo(() => getNasaImage("storm"), []);
   const warningLine =
     stormAlerts[0] != null
@@ -278,15 +299,23 @@ export function DepthWorldPlay(props: Props) {
         ? `NASA date ${event.eventDate.slice(0, 10)}.`
         : "No CME warning clock yet — power the radio.";
 
-  const hold = (kind: DragPayload["kind"], amount: number, label: string) => {
-    if (drag?.kind === kind) {
+  const hold = (
+    kind: DragPayload["kind"],
+    amount: number,
+    label: string,
+    crewId?: CrewId,
+  ) => {
+    if (drag?.kind === kind && drag.crewId === crewId) {
       setDrag(null);
+      setGhost(null);
       audio.play("uiClick");
       return;
     }
-    setDrag({ kind, amount });
+    setDrag({ kind, amount, crewId });
     audio.play("pick");
-    onNovaLine(`Holding ${label}. Tap a glowing drop target.`);
+    onNovaLine(
+      clipWords(`Holding ${label}. Drop on a green target.`),
+    );
   };
 
   if (!visible) return null;
@@ -301,6 +330,10 @@ export function DepthWorldPlay(props: Props) {
           x: ((e.clientX - r.left) / r.width) * 2 - 1,
           y: ((e.clientY - r.top) / r.height) * 2 - 1,
         });
+        if (drag) setGhost({ x: e.clientX, y: e.clientY });
+      }}
+      onPointerUp={() => {
+        /* drop resolves on hotspot pointerUp */
       }}
     >
       <Canvas
@@ -358,9 +391,10 @@ export function DepthWorldPlay(props: Props) {
       <div className="world3d-hud" data-hud>
         <div className="world3d-chips" data-chip-tray>
           <p className="world3d-chips__title">
-            Day {state.day}/10 · {free} free chips · {PLACE_LABELS[place]}
+            Day {state.day}/10 · {free} free · bat {state.battery}/{BATTERY_CAP} ·{" "}
+            {PLACE_LABELS[place]}
           </p>
-          <div className="world3d-chips__row">
+          <div className="world3d-chips__row" data-chip-tray-drag>
             {Array.from({ length: Math.min(powerToday, 20) }, (_, i) => (
               <button
                 key={i}
@@ -375,21 +409,31 @@ export function DepthWorldPlay(props: Props) {
                 }}
                 disabled={i >= free}
                 aria-label={i < free ? "Drag power chip" : "Spent chip"}
-                onClick={() => {
-                  if (i < free) hold("chip", 1, "a power chip");
+                onPointerDown={(e) => {
+                  if (i >= free) return;
+                  e.preventDefault();
+                  hold("chip", 1, "a power chip");
+                  setGhost({ x: e.clientX, y: e.clientY });
                 }}
               />
             ))}
           </div>
           <p className="world3d-chips__meta">
-            Science {state.science}/{SCIENCE_SUCCESS_TARGET} · 💧{state.water} ·
-            O₂{state.oxygen} · 🛡️{state.shieldLevel}
+            🔬{state.science}/{SCIENCE_SUCCESS_TARGET} · 💧{state.water} · O₂
+            {state.oxygen} · ⚠{Math.round(state.exposure)} · 🛡️
+            {state.shieldLevel}
+            {spent ? ` · plan −${spent}` : ""}
             {fx.waterHeld ? ` · drops ${fx.waterHeld}` : ""}
             {fx.samplesHeld || fx.roverSamples
               ? ` · samples ${fx.samplesHeld + fx.roverSamples}`
               : ""}
             {fx.materialsHeld ? ` · crates ${fx.materialsHeld}` : ""}
           </p>
+          {commsYesterday && stormAlerts.length > 0 ? (
+            <p className="world3d-chips__meta">
+              {clipWords(stormAlerts[0]!.message)}
+            </p>
+          ) : null}
         </div>
 
         <nav className="world3d-places" aria-label="Places">
@@ -409,20 +453,26 @@ export function DepthWorldPlay(props: Props) {
           <button
             type="button"
             className={drag?.kind === "water" ? "is-held" : ""}
-            onClick={() => hold("water", 1, "water drops")}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              hold("water", 1, "water drops");
+              setGhost({ x: e.clientX, y: e.clientY });
+            }}
           >
             💧 Water {fx.waterHeld ? `(${fx.waterHeld})` : ""}
           </button>
           <button
             type="button"
             className={drag?.kind === "crate" ? "is-held" : ""}
-            onClick={() => {
+            onPointerDown={(e) => {
+              e.preventDefault();
               if (fx.materialsHeld < 2) {
                 onNovaLine("Tap supply crates on the surface first.");
                 audio.play("uiClick");
                 return;
               }
               hold("crate", 2, "supply crates");
+              setGhost({ x: e.clientX, y: e.clientY });
             }}
           >
             📦 Crates
@@ -430,12 +480,14 @@ export function DepthWorldPlay(props: Props) {
           <button
             type="button"
             className={drag?.kind === "sample" ? "is-held" : ""}
-            onClick={() => {
+            onPointerDown={(e) => {
+              e.preventDefault();
               if (fx.samplesHeld + fx.roverSamples < 1) {
                 onNovaLine("Get samples from the rover or lab rack.");
                 return;
               }
               hold("sample", 1, "a sample");
+              setGhost({ x: e.clientX, y: e.clientY });
             }}
           >
             🪨 Sample
@@ -443,18 +495,55 @@ export function DepthWorldPlay(props: Props) {
           <button
             type="button"
             className={drag?.kind === "nova" ? "is-held" : ""}
-            onClick={() => hold("nova", 1, "Nova")}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              hold("nova", 1, "Nova");
+              setGhost({ x: e.clientX, y: e.clientY });
+            }}
           >
             🧑‍🚀 Nova
           </button>
-          <button
-            type="button"
-            className={drag?.kind === "crew" ? "is-held" : ""}
-            onClick={() => hold("crew", 1, "a crew member")}
-          >
-            👥 Crew
-          </button>
         </div>
+
+        {stormToday ? (
+          <div className="depth-storm-crew" aria-label="Shelter crew">
+            <p className="depth-storm-crew__title">
+              Storm! Drag crew into Home
+            </p>
+            <div className="depth-storm-crew__row">
+              {CREW.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`${fx.sheltered[c.id] ? "is-in" : ""}${
+                    drag?.crewId === c.id ? " is-held" : ""
+                  }`}
+                  disabled={fx.sheltered[c.id]}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    if (fx.sheltered[c.id]) return;
+                    hold("crew", 1, c.name, c.id);
+                    setGhost({ x: e.clientX, y: e.clientY });
+                  }}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {!consequence ? (
+          <MorningBriefing
+            state={state}
+            event={event}
+            alerts={stormAlerts}
+            commsYesterday={commsYesterday}
+            dayKey={state.day}
+            onPatch={patchDecisions}
+            onNovaLine={onNovaLine}
+          />
+        ) : null}
 
         {infoCard ? (
           <aside className="depth-info-card" role="dialog" aria-label="NASA info">
@@ -482,10 +571,22 @@ export function DepthWorldPlay(props: Props) {
         {novaLine ? <p className="world3d-nova">{novaLine}</p> : null}
 
         <p className="world3d-hint">
-          Hover for cost/benefit · drag chips onto machines · walk+tap USE ·
-          bunk ends day
+          Drag chips (green/red targets) · machines need full chips · bunk ends
+          day
         </p>
       </div>
+
+      {ghost && drag ? (
+        <div
+          className="depth-drag-ghost"
+          style={{ left: ghost.x, top: ghost.y }}
+          aria-hidden
+        />
+      ) : null}
+
+      {consequence ? (
+        <ConsequenceScene deltas={consequence} onContinue={afterConsequence} />
+      ) : null}
     </section>
   );
 }

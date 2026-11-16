@@ -63,7 +63,35 @@ export function Hotspot({
     (def.id === "surface_solar" && decisions.cleanFilter);
 
   const dropOk =
-    drag && def.accepts?.includes(drag.kind) ? true : drag ? false : null;
+    drag && def.accepts?.includes(drag.kind)
+      ? true
+      : drag && def.kind === "drop"
+        ? false
+        : drag &&
+            (def.id === "surface_door_home" ||
+              def.id === "surface_shelter" ||
+              def.id === "home_shelter") &&
+            (drag.kind === "crew" || drag.kind === "nova")
+          ? true
+          : drag
+            ? false
+            : null;
+
+  const fillKey =
+    def.id === "surface_radio"
+      ? "radio"
+      : def.id === "home_recycler"
+        ? "recycler"
+        : def.id === "home_air"
+          ? "air"
+          : def.id === "gh_light"
+            ? "greenhouse"
+            : def.id === "lab_analyzer"
+              ? "analyzer"
+              : def.id === "surface_solar"
+                ? "solar"
+                : null;
+  const fillAmt = fillKey ? (fx.fills[fillKey] ?? 0) : 0;
 
   useFrame((state) => {
     if (!group.current) return;
@@ -82,12 +110,15 @@ export function Hotspot({
       group.current.position.set(pos.x, y + bob, pos.z);
     }
     if (outline.current) {
-      const show = hovered || active || dropOk === true;
-      outline.current.visible = show;
+      // Hit-test highlight while dragging: green accept / red reject
+      const show =
+        hovered || active || (drag != null && hovered) || (dropOk === true && hovered);
+      outline.current.visible = Boolean(show || (hovered && drag));
       const pulse = reduce ? 1 : 1 + Math.sin(t * 5) * 0.06;
-      outline.current.scale.setScalar(show ? pulse : 1);
+      outline.current.scale.setScalar(show ? pulse * 1.08 : 1);
       const mat = outline.current.material as THREE.MeshBasicMaterial;
-      if (dropOk === false) mat.color.set("#c45c5c");
+      if (hovered && dropOk === false) mat.color.set("#c45c5c");
+      else if (hovered && dropOk === true) mat.color.set("#3bb273");
       else if (on) mat.color.set("#7dcea0");
       else mat.color.set("#e8c96a");
     }
@@ -118,6 +149,10 @@ export function Hotspot({
         onPointerDown={(e) => {
           e.stopPropagation();
           onActivate(def);
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation();
+          if (drag) onActivate(def);
         }}
       >
         <planeGeometry args={[def.scale, def.scale]} />
@@ -176,6 +211,16 @@ export function Hotspot({
           <span className={`depth-stage${trayWilt ? " is-wilt" : ""}`}>
             {trayWilt ? "wilt" : `stage ${trayStage}`}
           </span>
+        </Html>
+      ) : null}
+      {fillAmt > 0 && !on ? (
+        <Html center position={[0, -def.scale * 0.35, 0]} distanceFactor={10} style={{ pointerEvents: "none" }}>
+          <span className="depth-fill-pip">{fillAmt} in</span>
+        </Html>
+      ) : null}
+      {on ? (
+        <Html center position={[0, -def.scale * 0.35, 0]} distanceFactor={10} style={{ pointerEvents: "none" }}>
+          <span className="depth-fill-pip">ON</span>
         </Html>
       ) : null}
       {showTip ? (

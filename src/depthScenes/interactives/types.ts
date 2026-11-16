@@ -36,9 +36,13 @@ export type InteractiveDef = {
   sfxDone?: SfxId;
 };
 
+export type CrewId = "sam" | "mira" | "ana";
+
 export type DragPayload = {
   kind: DragKind;
   amount: number;
+  /** Storm crew portrait id when kind === "crew". */
+  crewId?: CrewId;
 };
 
 export type PlaceFx = {
@@ -55,4 +59,8 @@ export type PlaceFx = {
   materialsHeld: number;
   harvestReady: boolean;
   dayEnding: boolean;
+  /** Partial chip fills toward machine costs (engine chip costs). */
+  fills: Record<string, number>;
+  /** Storm shelter map. */
+  sheltered: Record<CrewId, boolean>;
 };

@@ -55,7 +55,7 @@ export function InteractiveLayer({
     const dist = Math.hypot(nova.x - wx, nova.z - wz);
     const near = dist <= (def.useRadius ?? 2.2);
 
-    const payload = def.kind === "drop" ? drag : null;
+    const payload = drag;
 
     if (def.kind === "drop" && !payload) {
       audio.play("uiHover");

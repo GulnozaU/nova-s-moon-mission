@@ -35,12 +35,73 @@ export type ActionResult = {
   infoOverride?: string;
 };
 
-function freePower(d: DayDecisions, powerToday: number): number {
-  return Math.max(0, powerToday - plannedPowerCost(d));
+export function fillReserved(fills: Record<string, number>): number {
+  let n = 0;
+  for (const v of Object.values(fills)) n += v;
+  return n;
 }
 
-function canSpend(d: DayDecisions, powerToday: number, extra: number): boolean {
-  return freePower(d, powerToday) >= extra;
+export function freePower(
+  d: DayDecisions,
+  powerToday: number,
+  fills: Record<string, number> = {},
+): number {
+  return Math.max(0, powerToday - plannedPowerCost(d) - fillReserved(fills));
+}
+
+function canSpend(
+  d: DayDecisions,
+  powerToday: number,
+  extra: number,
+  fills: Record<string, number> = {},
+): boolean {
+  return freePower(d, powerToday, fills) >= extra;
+}
+
+/** Drop chips until `need` — machine turns ON only when full (engine cost). */
+function fillChipMachine(
+  fillKey: string,
+  need: number,
+  decisionKey: "recycler" | "oxygenMaker" | "comms" | "greenhouse" | "cleanFilter",
+  amount: number,
+  decisions: DayDecisions,
+  powerToday: number,
+  fx: PlaceFx,
+  onMsg: string,
+  offMsg: string,
+): ActionResult {
+  const currentlyOn = Boolean(decisions[decisionKey]);
+  if (currentlyOn) {
+    const fills = { ...fx.fills, [fillKey]: 0 };
+    return {
+      ok: true,
+      message: offMsg,
+      patch: { [decisionKey]: false },
+      fx: { fills },
+    };
+  }
+  if (!canSpend(decisions, powerToday, amount, fx.fills)) {
+    return { ok: false, message: "Not enough free chips." };
+  }
+  const nextFill = Math.min(need, (fx.fills[fillKey] ?? 0) + amount);
+  if (nextFill >= need) {
+    const trial = { ...decisions, [decisionKey]: true };
+    if (plannedPowerCost(trial) > powerToday) {
+      return { ok: false, message: "Not enough power chips for this machine." };
+    }
+    const fills = { ...fx.fills, [fillKey]: 0 };
+    return {
+      ok: true,
+      message: onMsg,
+      patch: { [decisionKey]: true },
+      fx: { fills, growLightOn: decisionKey === "greenhouse" ? true : fx.growLightOn },
+    };
+  }
+  return {
+    ok: true,
+    message: `${nextFill}/${need} chips in…`,
+    fx: { fills: { ...fx.fills, [fillKey]: nextFill } },
+  };
 }
 
 export function runInteractive(ctx: ActionCtx): ActionResult {
@@ -58,35 +119,48 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
   }
 
   // —— Surface ——
-  if (id === "surface_door_home") return { ok: true, message: "Entering Crew home.", goPlace: "home" };
+  if (id === "surface_door_home" && payload?.kind !== "crew" && payload?.kind !== "nova") {
+    return { ok: true, message: "Entering Crew home.", goPlace: "home" };
+  }
   if (id === "surface_door_gh")
     return { ok: true, message: "Entering Greenhouse.", goPlace: "greenhouse" };
   if (id === "surface_door_lab") return { ok: true, message: "Entering Science lab.", goPlace: "lab" };
 
   if (id === "surface_radio") {
-    if (decisions.comms) return { ok: true, message: "Radio already on.", patch: {} };
-    if (!canSpend(decisions, powerToday, COMMS_COST))
-      return { ok: false, message: "Need 1 free chip for the radio." };
-    return {
-      ok: true,
-      message: "Radio live — Mission Control can warn us.",
-      patch: { comms: true },
-    };
+    if (payload?.kind !== "chip" && !decisions.comms) {
+      return { ok: false, message: "Drag a chip onto the radio." };
+    }
+    return fillChipMachine(
+      "radio",
+      COMMS_COST,
+      "comms",
+      payload?.amount ?? 1,
+      decisions,
+      powerToday,
+      fx,
+      "Radio live — Mission Control can warn us.",
+      "Radio off.",
+    );
   }
 
   if (id === "surface_solar") {
-    if (decisions.cleanFilter)
-      return { ok: true, message: "Panels already cleaned today." };
-    if (state.materials < CLEAN_FILTER_MATERIAL_COST)
+    if (state.materials < CLEAN_FILTER_MATERIAL_COST && !decisions.cleanFilter)
       return { ok: false, message: "Need 1 material to clean panels." };
-    if (!canSpend(decisions, powerToday, CLEAN_FILTER_POWER_COST))
-      return { ok: false, message: "Need 1 free chip to clean panels." };
-    return {
-      ok: true,
-      message: "Solar field cleaned — power stays steadier.",
-      patch: { cleanFilter: true },
-      fx: { tankPulse: fx.tankPulse + 1 },
-    };
+    const r = fillChipMachine(
+      "solar",
+      CLEAN_FILTER_POWER_COST,
+      "cleanFilter",
+      payload?.amount ?? 1,
+      decisions,
+      powerToday,
+      fx,
+      "Solar field cleaned — power stays steadier.",
+      "Cleaning cancelled.",
+    );
+    if (r.ok && r.patch?.cleanFilter) {
+      return { ...r, fx: { ...r.fx, tankPulse: fx.tankPulse + 1 } };
+    }
+    return r;
   }
 
   if (id === "surface_rover") {
@@ -95,7 +169,7 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
     const need = SCIENCE_COST_PER_LEVEL;
     if (nextLv === decisions.scienceLevel)
       return { ok: false, message: "Science walks are full today." };
-    if (!canSpend(decisions, powerToday, need))
+    if (!canSpend(decisions, powerToday, need, fx.fills))
       return { ok: false, message: "Need 1 free chip for the rover." };
     return {
       ok: true,
@@ -149,6 +223,28 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
     };
   }
 
+  if (
+    id === "surface_shelter" ||
+    id === "home_shelter" ||
+    id === "surface_door_home"
+  ) {
+    if (payload?.kind === "crew" || payload?.kind === "nova") {
+      const sheltered = { ...fx.sheltered };
+      const idKey = payload.crewId ?? "sam";
+      sheltered[idKey] = true;
+      // Also mark others if nova (Nova counts as leading one crew in)
+      if (payload.kind === "nova") sheltered.sam = true;
+      const n = Object.values(sheltered).filter(Boolean).length;
+      return {
+        ok: true,
+        message: `Crew sheltered ${n}/3.`,
+        patch: { shelteredCrewCount: n },
+        fx: { sheltered },
+        goPlace: id === "surface_door_home" ? "home" : undefined,
+      };
+    }
+  }
+
   if (id === "surface_shelter" || id === "home_shelter") {
     const n = Math.min(3, (decisions.shelteredCrewCount ?? 0) + 1);
     return {
@@ -160,25 +256,31 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
 
   // —— Home ——
   if (id === "home_recycler") {
-    if (decisions.recycler) return { ok: true, message: "Water cleaner already on." };
-    if (!canSpend(decisions, powerToday, RECYCLER_COST))
-      return { ok: false, message: "Need 2 free chips." };
-    return {
-      ok: true,
-      message: "Water cleaner humming.",
-      patch: { recycler: true },
-    };
+    return fillChipMachine(
+      "recycler",
+      RECYCLER_COST,
+      "recycler",
+      payload?.amount ?? 1,
+      decisions,
+      powerToday,
+      fx,
+      "Water cleaner humming.",
+      "Water cleaner off.",
+    );
   }
 
   if (id === "home_air") {
-    if (decisions.oxygenMaker) return { ok: true, message: "Air maker already on." };
-    if (!canSpend(decisions, powerToday, OXYGEN_MAKER_COST))
-      return { ok: false, message: "Need 2 free chips." };
-    return {
-      ok: true,
-      message: "Air maker hissing — more oxygen tonight.",
-      patch: { oxygenMaker: true },
-    };
+    return fillChipMachine(
+      "air",
+      OXYGEN_MAKER_COST,
+      "oxygenMaker",
+      payload?.amount ?? 1,
+      decisions,
+      powerToday,
+      fx,
+      "Air maker hissing — more oxygen tonight.",
+      "Air maker off.",
+    );
   }
 
   if (id === "home_bunk") {
@@ -248,16 +350,27 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
   }
 
   if (id === "gh_light") {
-    if (decisions.greenhouse) return { ok: true, message: "Grow light already on." };
-    if (!canSpend(decisions, powerToday, GREENHOUSE_COST))
-      return { ok: false, message: "Need 1 free chip." };
-    const stage = fx.plantStage.map((s) => Math.min(3, s + (s > 0 ? 1 : 0))) as PlaceFx["plantStage"];
-    return {
-      ok: true,
-      message: "Grow light on — plants drink light.",
-      patch: { greenhouse: true },
-      fx: { growLightOn: true, plantStage: stage },
-    };
+    const r = fillChipMachine(
+      "greenhouse",
+      GREENHOUSE_COST,
+      "greenhouse",
+      payload?.amount ?? 1,
+      decisions,
+      powerToday,
+      fx,
+      "Grow light on — plants drink light.",
+      "Grow light off.",
+    );
+    if (r.ok && r.patch?.greenhouse) {
+      const stage = fx.plantStage.map((s) =>
+        Math.min(3, s + (s > 0 ? 1 : 0)),
+      ) as PlaceFx["plantStage"];
+      return {
+        ...r,
+        fx: { ...r.fx, growLightOn: true, plantStage: stage },
+      };
+    }
+    return r;
   }
 
   if (id === "gh_harvest") {
@@ -276,26 +389,35 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
 
   // —— Lab ——
   if (id === "lab_analyzer") {
-    if (payload?.kind === "sample" || fx.samplesHeld > 0) {
-      if (!canSpend(decisions, powerToday, SCIENCE_COST_PER_LEVEL))
+    if (payload?.kind === "sample" || (payload?.kind === "chip" && (fx.samplesHeld > 0 || fx.roverSamples > 0))) {
+      const fillKey = "analyzer";
+      const need = SCIENCE_COST_PER_LEVEL;
+      if (payload.kind === "sample") {
+        // Sample alone arms the machine; still need chips to run.
+        return {
+          ok: true,
+          message: "Sample loaded — drop a chip to run.",
+          fx: {
+            samplesHeld: Math.max(0, fx.samplesHeld),
+            analyzerGlow: false,
+            fills: { ...fx.fills, [fillKey]: fx.fills[fillKey] ?? 0 },
+          },
+        };
+      }
+      if (!canSpend(decisions, powerToday, need, fx.fills))
         return { ok: false, message: "Need 1 free chip to run the analyzer." };
+      const nextFill = Math.min(need, (fx.fills[fillKey] ?? 0) + (payload.amount ?? 1));
+      if (nextFill < need) {
+        return {
+          ok: true,
+          message: `${nextFill}/${need} chips in…`,
+          fx: { fills: { ...fx.fills, [fillKey]: nextFill } },
+        };
+      }
       const nextLv = Math.min(SCIENCE_LEVEL_MAX, decisions.scienceLevel + 1);
-      return {
-        ok: true,
-        message: "Samples → science!",
-        patch: { scienceLevel: nextLv },
-        fx: {
-          analyzerGlow: true,
-          samplesHeld: Math.max(0, fx.samplesHeld - 1),
-        },
-      };
-    }
-    if (payload?.kind === "chip") {
-      if (fx.samplesHeld < 1 && fx.roverSamples < 1)
-        return { ok: false, message: "Load samples from the rack first." };
-      if (!canSpend(decisions, powerToday, SCIENCE_COST_PER_LEVEL))
-        return { ok: false, message: "Need 1 free chip." };
-      const nextLv = Math.min(SCIENCE_LEVEL_MAX, decisions.scienceLevel + 1);
+      const trial = { ...decisions, scienceLevel: nextLv };
+      if (plannedPowerCost(trial) > powerToday)
+        return { ok: false, message: "Not enough power chips." };
       return {
         ok: true,
         message: "Analyzer whirring — science up!",
@@ -304,9 +426,12 @@ export function runInteractive(ctx: ActionCtx): ActionResult {
           analyzerGlow: true,
           samplesHeld: Math.max(0, fx.samplesHeld - 1),
           roverSamples: Math.max(0, fx.roverSamples - 1),
+          fills: { ...fx.fills, [fillKey]: 0 },
         },
       };
     }
+    if (payload?.kind === "chip" && fx.samplesHeld < 1 && fx.roverSamples < 1)
+      return { ok: false, message: "Load samples from the rack first." };
     return { ok: false, message: "Drop a chip or a sample here." };
   }
 
@@ -362,5 +487,7 @@ export function defaultPlaceFx(): PlaceFx {
     materialsHeld: 0,
     harvestReady: false,
     dayEnding: false,
+    fills: {},
+    sheltered: { sam: false, mira: false, ana: false },
   };
 }
