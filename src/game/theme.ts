@@ -22,7 +22,7 @@ export const THEME = {
   bad: 0xc98b7b,
   dim: 0x3a3348,
   font: "Nunito, system-ui, sans-serif",
-  fontDisplay: "Baloo 2, Nunito, system-ui, sans-serif",
+  fontDisplay: "Pixelify Sans, Nunito, system-ui, sans-serif",
 } as const;
 
 export const UI_TEXT = {

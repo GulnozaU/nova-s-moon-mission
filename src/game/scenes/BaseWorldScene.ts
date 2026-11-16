@@ -74,7 +74,6 @@ export class BaseWorldScene extends Phaser.Scene {
   private dishImg: Phaser.GameObjects.Image | null = null;
   private dishSpin: Phaser.Tweens.Tween | null = null;
   private panelsImg: Phaser.GameObjects.Image | null = null;
-  private roverImg: Phaser.GameObjects.Image | null = null;
   private chipTray!: ChipTray;
   private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
@@ -178,11 +177,6 @@ export class BaseWorldScene extends Phaser.Scene {
       .setDepth(8);
 
     const roverPos = uvToWorld(W, H, HUB.rover);
-    this.roverImg = this.add
-      .image(roverPos.x, roverPos.y - 8, "rover")
-      .setDisplaySize(70, 46)
-      .setAlpha(0.0)
-      .setDepth(8);
     // Bounce a soft pad under the painted rover so drag targets feel alive.
     const roverPad = this.add
       .image(roverPos.x, roverPos.y + 10, "softPad")

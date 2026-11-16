@@ -23,14 +23,14 @@ export class PlaceHud {
     let y = 0;
     for (const p of places) {
       const bg = scene.add
-        .rectangle(0, y, 108, 28, p.id === current ? THEME.good : THEME.panel, 0.95)
+        .rectangle(0, y, 112, 30, p.id === current ? THEME.good : THEME.panel, 0.98)
         .setOrigin(1, 0)
-        .setStrokeStyle(2, THEME.line, 0.2)
+        .setStrokeStyle(3, THEME.line, 0.35)
         .setInteractive({ useHandCursor: true });
       const t = scene.add
-        .text(-54, y + 14, p.label, {
+        .text(-56, y + 15, p.label, {
           fontFamily: THEME.fontDisplay,
-          fontSize: "12px",
+          fontSize: "13px",
           color: THEME.ink,
           fontStyle: "bold",
         })

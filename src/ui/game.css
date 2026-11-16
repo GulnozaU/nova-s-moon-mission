@@ -1,12 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap");
 
-/* Cartoon moon-base palette — matches the storybook art, not generic AI purple UI */
+/* Soft-pixel moon-base palette — matches Gemini hub / room art */
 :root {
   --ink: #3a3348;
   --ink-soft: #6a6278;
   --parchment: #f3ebe0;
   --parchment-2: #e8dccb;
-  --card: rgba(247, 239, 228, 0.92);
+  --card: #fff8ef;
   --sky: #9eb6c9;
   --sky-deep: #6f8fa8;
   --mauve: #b7a4c4;
@@ -16,16 +16,17 @@
   --peach: #e2b48a;
   --rose: #c98b7b;
   --cream: #fff8ef;
-  --line: rgba(58, 51, 72, 0.14);
-  --shadow: 0 14px 28px rgba(58, 51, 72, 0.18);
+  --line: rgba(58, 51, 72, 0.22);
+  --shadow: 0 4px 0 rgba(58, 51, 72, 0.22);
   --meter-power: #e0c15a;
   --meter-water: #7aa7c4;
   --meter-o2: #7faf86;
   --meter-risk: #c98b7b;
-  --font-display: "Baloo 2", "Nunito", sans-serif;
+  --font-display: "Pixelify Sans", "Nunito", sans-serif;
   --font-body: "Nunito", sans-serif;
-  --radius: 20px;
+  --radius: 8px;
   --btn-min: 48px;
+  --border: 3px solid rgba(58, 51, 72, 0.28);
 }
 
 /* Storybook pastel sheet — shared with Phaser THEME */
@@ -57,9 +58,8 @@
   color: var(--ink);
   font-family: var(--font-body);
   background:
-    radial-gradient(ellipse at 20% 0%, rgba(158, 182, 201, 0.55), transparent 50%),
-    radial-gradient(ellipse at 90% 10%, rgba(183, 164, 196, 0.35), transparent 42%),
-    linear-gradient(180deg, #d5e0ea 0%, #cfc3b4 55%, #b9a793 100%);
+    linear-gradient(180deg, #a8bdc9 0%, #c5b8a6 48%, #b09a82 100%);
+  image-rendering: auto;
 }
 
 .nova-app *,
@@ -120,17 +120,16 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border: 0;
   background: var(--card);
-  border-radius: 999px;
+  border-radius: var(--radius);
   padding: 0.25rem 0.75rem 0.25rem 0.25rem;
   font: inherit;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   cursor: pointer;
   box-shadow: var(--shadow);
-  border: 1px solid var(--line);
+  border: var(--border);
 }
 .brand img {
   width: 40px;
@@ -145,29 +144,70 @@
   padding: 0 0.75rem 2rem;
 }
 
-/* Soft pixel shell — chunkier UI, mild crisp images */
+/* Soft-pixel shell — chunky borders, stepped shadows, no pill chrome */
 .nova-app.soft-pixel {
-  --radius: 10px;
+  --radius: 6px;
+  --shadow: 0 4px 0 rgba(58, 51, 72, 0.28);
+}
+.nova-app.soft-pixel h1,
+.nova-app.soft-pixel h2,
+.nova-app.soft-pixel .brand span,
+.nova-app.soft-pixel .eyebrow,
+.nova-app.soft-pixel .btn,
+.nova-app.soft-pixel .dialogue__name {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
 }
 .nova-app.soft-pixel .btn {
-  border-radius: 10px;
-  box-shadow: 0 3px 0 rgba(58, 51, 72, 0.18);
+  border-radius: var(--radius);
+  border: var(--border);
+  box-shadow: 0 4px 0 rgba(58, 51, 72, 0.28);
+  image-rendering: auto;
+}
+.nova-app.soft-pixel .btn.primary {
+  box-shadow: 0 4px 0 rgba(40, 58, 38, 0.45);
+}
+.nova-app.soft-pixel .btn:active {
+  box-shadow: 0 1px 0 rgba(58, 51, 72, 0.28);
+  transform: translateY(3px);
 }
 .nova-app.soft-pixel .dialogue__box,
 .nova-app.soft-pixel .site-card,
-.nova-app.soft-pixel .panel {
-  border-radius: 12px;
-  border-width: 3px;
+.nova-app.soft-pixel .panel,
+.nova-app.soft-pixel .dash,
+.nova-app.soft-pixel .drawer,
+.nova-app.soft-pixel .legend-screen,
+.nova-app.soft-pixel .end-report {
+  border-radius: var(--radius);
+  border: var(--border);
+  box-shadow: var(--shadow);
+  background: var(--cream);
+}
+.nova-app.soft-pixel .source-badge {
+  border-radius: 4px;
+  border: 2px solid var(--line);
 }
 .nova-app.soft-pixel img.training-lesson__art,
 .nova-app.soft-pixel .dialogue__face,
-.nova-app.soft-pixel .brand img {
+.nova-app.soft-pixel .brand img,
+.nova-app.soft-pixel .site-card img,
+.nova-app.soft-pixel .welcome-hero__nova {
   image-rendering: auto;
+  border-radius: 4px;
 }
 .nova-app.soft-pixel .welcome-hero {
   background-size: cover;
-  background-position: center 60%;
-  filter: contrast(1.04) saturate(1.06);
+  background-position: center 55%;
+  filter: contrast(1.05) saturate(1.08);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.nova-app.soft-pixel .nova-top {
+  background: rgba(255, 248, 239, 0.88);
+  border-bottom: var(--border);
+  margin-bottom: 0.5rem;
 }
 .training-lesson__skip {
   display: flex;
@@ -182,25 +222,26 @@
 }
 
 .btn {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.7rem 1.15rem;
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 1.1rem;
   font: inherit;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .btn:hover { transform: translateY(-2px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .btn.primary {
   background: var(--sage-ink);
   color: var(--cream);
-  box-shadow: 0 8px 0 rgba(77, 101, 72, 0.35);
+  box-shadow: 0 4px 0 rgba(77, 101, 72, 0.45);
 }
 .btn.ghost {
   background: var(--cream);
   color: var(--ink);
-  border: 2px solid var(--line);
+  border: var(--border);
 }
 .btn.wide { width: 100%; }
 .btn.pulse { animation: pulse 1.8s ease-in-out infinite; }
@@ -293,9 +334,9 @@
 .dash {
   position: relative;
   min-height: calc(100vh - 5.5rem);
-  border-radius: 28px;
+  border-radius: var(--radius);
   overflow: hidden;
-  border: 2px solid rgba(58, 51, 72, 0.12);
+  border: var(--border);
   box-shadow: var(--shadow);
 }
 

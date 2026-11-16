@@ -85,8 +85,6 @@ export class IndoorScene extends Phaser.Scene {
   private clipboardPanel: Phaser.GameObjects.Container | null = null;
   private coach: GuideCoach | null = null;
   private recyclerPos = { x: 0, y: 0 };
-  private traysPos = { x: 0, y: 0 };
-  private analyzerPos = { x: 0, y: 0 };
   private bedPos = { x: 0, y: 0 };
 
   constructor() {
@@ -408,7 +406,6 @@ export class IndoorScene extends Phaser.Scene {
       this.drag.begin({ kind: "water", amount: GREENHOUSE_WATER }, p.worldX, p.worldY, 0x3a7ca5);
     });
 
-    this.traysPos = { x: W * 0.46, y: H * 0.62 };
     this.addStation(
       new JobStation(this, {
         id: "trays",
@@ -551,7 +548,6 @@ export class IndoorScene extends Phaser.Scene {
       this.openOsdrClipboard(W, H);
     });
 
-    this.analyzerPos = { x: W * 0.5, y: H * 0.62 };
     this.addStation(
       new JobStation(this, {
         id: "analyzer",

@@ -2,10 +2,12 @@
   position: relative;
   width: 100%;
   height: min(70vh, 640px);
-  border-radius: 12px;
+  border-radius: 6px;
   overflow: hidden;
-  background: #1a1410;
+  background: #6a7a88;
   touch-action: none;
+  border: 3px solid rgba(58, 51, 72, 0.28);
+  box-shadow: 0 4px 0 rgba(58, 51, 72, 0.28);
 }
 
 .world3d-root--fullscreen {
@@ -50,16 +52,17 @@
   top: 10px;
   left: 10px;
   background: #fff8ef;
-  border: 2px solid rgba(58, 51, 72, 0.2);
-  border-radius: 10px;
+  border: 3px solid rgba(58, 51, 72, 0.28);
+  border-radius: 6px;
   padding: 8px 10px;
   min-width: 200px;
   max-width: min(420px, 92vw);
+  box-shadow: 0 4px 0 rgba(58, 51, 72, 0.22);
 }
 
 .world3d-chips__title {
-  font-family: "Baloo 2", Nunito, sans-serif;
-  font-size: 13px;
+  font-family: "Pixelify Sans", Nunito, sans-serif;
+  font-size: 14px;
   margin: 0 0 6px;
 }
 
@@ -75,6 +78,7 @@
   border-radius: 3px;
   background: #6a6570;
   opacity: 0.4;
+  border: 2px solid rgba(58, 51, 72, 0.25);
 }
 
 .world3d-chip.is-free {
@@ -105,13 +109,14 @@
   min-height: 48px;
   min-width: 48px;
   padding: 8px 12px;
-  border-radius: 10px;
-  border: 2px solid rgba(58, 51, 72, 0.25);
+  border-radius: 6px;
+  border: 3px solid rgba(58, 51, 72, 0.28);
   background: #fff8ef;
-  font-family: "Baloo 2", Nunito, sans-serif;
+  font-family: "Pixelify Sans", Nunito, sans-serif;
   font-size: 14px;
   color: #3a3348;
   cursor: pointer;
+  box-shadow: 0 3px 0 rgba(58, 51, 72, 0.22);
 }
 
 .world3d-places button.is-here {
@@ -125,12 +130,13 @@
   transform: translateX(-50%);
   width: min(520px, 92vw);
   background: #fff8ef;
-  border: 2px solid rgba(58, 51, 72, 0.2);
-  border-radius: 12px;
+  border: 3px solid rgba(58, 51, 72, 0.28);
+  border-radius: 6px;
   padding: 12px 14px;
   font-size: 15px;
   line-height: 1.35;
   text-align: center;
+  box-shadow: 0 4px 0 rgba(58, 51, 72, 0.22);
 }
 
 .world3d-hint {
@@ -138,8 +144,9 @@
   left: 10px;
   bottom: 10px;
   font-size: 11px;
-  background: rgba(255, 248, 239, 0.9);
+  background: rgba(255, 248, 239, 0.95);
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   max-width: 40%;
+  border: 2px solid rgba(58, 51, 72, 0.2);
 }
