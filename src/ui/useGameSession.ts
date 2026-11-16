@@ -19,6 +19,7 @@ import {
 } from "../content/schedule";
 import type { Event, GameState, SiteId, SourceBadge } from "../types";
 import { novaTrimSpeech, trimDecisionsToBudget } from "../game/trimBudget";
+import { sitePickNovaLine } from "../game/siteCopy";
 import { resetMissionGuide } from "../game/tutorial/session";
 import { defaultDecisions } from "./powerMath";
 
@@ -320,7 +321,11 @@ export function useGameSession(): GameSession {
       );
       const trimmed = trimDecisionsToBudget(defaultDecisions(), power);
       setDecisions(trimmed.decisions);
-      setNovaLine(novaTrimSpeech(trimmed.turnedOff, 1));
+      {
+        const pickLine = sitePickNovaLine(chosen);
+        const trimLine = novaTrimSpeech(trimmed.turnedOff, 1);
+        setNovaLine(trimmed.turnedOff.length ? `${pickLine} ${trimLine}` : pickLine);
+      }
       setCommsYesterday(false);
       setSheltering(false);
       setLastResult(null);

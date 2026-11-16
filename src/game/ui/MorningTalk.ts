@@ -4,6 +4,7 @@ import { audio } from "../../audio/audio";
 import { morningTalk, type NovaChoice } from "../novaTalk";
 import { bridge } from "../bridge";
 import { clipWords } from "../novaTalk";
+import { siteDay1Story, sitePickNovaLine } from "../siteCopy";
 import { RAIL_W } from "./railLayout";
 
 /** One briefing per day — coming back to the surface should not cover the chips again. */
@@ -25,20 +26,21 @@ export class MorningTalk {
     // and a tiny “what next” on day 1 after tutorial ends (coach handles first jobs).
     if (day < 1) return;
     if (day === 1) {
+      const site = bridge().getState().site;
       this.show(
         scene,
-        clipWords("Day 1: I stay here and guide you."),
-        clipWords("Places are on the left. Tap Home, Plants, or Lab. The picture stays clear."),
+        clipWords("Day 1: your Moon place already matters."),
+        clipWords(siteDay1Story(site)),
         [
           {
             id: "lets_go",
             label: "Guide me",
-            hint: "Drag a yellow chip from the left tray onto the Radio glow.",
+            hint: sitePickNovaLine(site),
           },
           {
             id: "skip_coach",
             label: "I know this",
-            hint: "Tap a place on the left. Drag me onto the bunk in Home to end the day.",
+            hint: "Yellow strip left = your site rule. Science walk shows ridge vs plain points.",
           },
         ],
       );

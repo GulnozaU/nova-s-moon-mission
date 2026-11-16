@@ -23,17 +23,16 @@ import {
   fadeSlideIn,
   floatNumber,
   oxygenBubbles,
-  pulseDoorGlow,
   sparkBurst,
   stormImpactFx,
 } from "../anim";
 import { ChipTray } from "../ui/ChipTray";
+import { SiteBadge } from "../ui/SiteBadge";
 import { JobLegend } from "../ui/JobLegend";
 import { PlaceHud } from "../ui/PlaceHud";
 import { paintSideRail, WORLD_H, WORLD_W, worldX, worldY } from "../ui/railLayout";
 import { CrewTalk } from "../ui/CrewTalk";
 import { JobStation } from "../ui/JobStation";
-import { NasaFrame } from "../ui/NasaFrame";
 import { GuideCoach } from "../ui/GuideCoach";
 import { NovaGuide } from "../ui/NovaGuide";
 import { ConsequenceOverlay } from "../ui/ConsequenceOverlay";
@@ -62,6 +61,7 @@ export class IndoorScene extends Phaser.Scene {
   private guide!: NovaGuide;
   private ending = false;
   private chipTray!: ChipTray;
+  private siteBadge!: SiteBadge;
   private crewTalk!: CrewTalk;
   private exitDoor = { x: 0, y: 0, r: 32 };
   private doorCooldown = 0;
@@ -124,18 +124,19 @@ export class IndoorScene extends Phaser.Scene {
     const exitGlow = this.add
       .image(this.exitDoor.x, this.exitDoor.y, "softPad")
       .setDisplaySize(88, 28)
-      .setTint(0xffe08a)
-      .setAlpha(0.45)
+      .setAlpha(0.01)
       .setDepth(12)
       .setInteractive({ useHandCursor: true });
-    pulseDoorGlow(this, exitGlow);
     exitGlow.on("pointerdown", (p: Phaser.Input.Pointer) => {
       p.event.stopPropagation();
       this.leaveToSurface();
     });
 
+    this.siteBadge = new SiteBadge(this);
     this.chipTray = new ChipTray(this);
     this.chipTray.setDrag(this.drag);
+    if (this.room === "greenhouse") this.chipTray.showWater(GREENHOUSE_WATER);
+    if (this.room === "lab") this.addNotesButton();
     this.guide = new NovaGuide(this, this.drag);
     const place = this.room as PlaceId;
     if (bridge().ready()) resetTutorialForDay(bridge().getDay());
@@ -164,6 +165,7 @@ export class IndoorScene extends Phaser.Scene {
     }
 
     this.chipTray.refresh(true);
+    this.siteBadge.refresh(true);
     for (const s of this.stations) s.refresh();
     this.syncLegend();
   }
@@ -202,9 +204,6 @@ export class IndoorScene extends Phaser.Scene {
         costs: [{ icon: "⚡", value: -HEAT_COST }],
         benefits: [{ icon: "🌡", value: "safe" }],
         accept: "chip",
-        artKey: "zap",
-        artW: 36,
-        artH: 36,
         getOn: () => true,
         onDrop: () => {
           this.say("Heat stays on every day (already paid).");
@@ -230,9 +229,6 @@ export class IndoorScene extends Phaser.Scene {
         ],
         accept: "chip",
         chipCost: RECYCLER_COST,
-        artKey: "waterCleaner",
-        artW: 56,
-        artH: 48,
         getOn: () => bridge().getDecisions().recycler,
         getFill: () => this.fills.recycler ?? 0,
         onDrop: (p) => {
@@ -267,9 +263,6 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "O₂", value: OXYGEN_MAKER_GAIN }],
         accept: "chip",
         chipCost: OXYGEN_MAKER_COST,
-        artKey: "airMaker",
-        artW: 52,
-        artH: 48,
         getOn: () => bridge().getDecisions().oxygenMaker,
         getFill: () => this.fills.air ?? 0,
         onDrop: (p) =>
@@ -287,9 +280,6 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "→", value: "night" }],
         accept: "nova",
         radius: 42,
-        artKey: "bunkMarker",
-        artW: 54,
-        artH: 36,
         getOn: () => false,
         onDrop: () => {
           this.finishDay();
@@ -300,20 +290,7 @@ export class IndoorScene extends Phaser.Scene {
   }
 
   private buildGreenhouse() {
-    this.sideNote = "Bucket: drag water onto the plant trays.";
-    // Painting already shows plants — only soft drop pads + tap (no floating junk).
-    const tap = this.add.container(worldX(0.18), worldY(0.62)).setDepth(16);
-    const spout = this.add
-      .image(0, 0, this.textures.exists("bucketFull") ? "bucketFull" : "waterTap")
-      .setDisplaySize(44, 52);
-    tap.add(spout);
-    tap.setSize(48, 56);
-    tap.setInteractive(new Phaser.Geom.Rectangle(-24, -32, 48, 60), Phaser.Geom.Rectangle.Contains);
-    tap.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      p.event.stopPropagation();
-      this.drag.begin({ kind: "water", amount: GREENHOUSE_WATER }, p.worldX, p.worldY, 0x3a7ca5);
-    });
-
+    // Water is the drop in the left column. The painting stays clear.
     this.addStation(
       new JobStation(this, {
         id: "trays",
@@ -356,9 +333,6 @@ export class IndoorScene extends Phaser.Scene {
         ],
         accept: "chip",
         chipCost: GREENHOUSE_COST,
-        artKey: "growLight",
-        artW: 64,
-        artH: 28,
         getOn: () => this.growLightOn,
         onDrop: () => {
           if (!this.plantsWatered) {
@@ -405,42 +379,6 @@ export class IndoorScene extends Phaser.Scene {
         ? SCIENCE_POINTS_PLAIN
         : SCIENCE_POINTS_RIM;
 
-    new NasaFrame(this, worldX(0.22), worldY(0.42), true);
-    this.sideNote = bridge().getCommsYesterday()
-      ? "Radio was on. Read the wall screen."
-      : "No warning — radio was off yesterday.";
-
-    // OSDR clipboard — soft pad + label (painting carries the desk)
-    const clip = this.add.container(worldX(0.78), worldY(0.42)).setDepth(56);
-    const board = this.add
-      .image(0, 0, "softPad")
-      .setDisplaySize(88, 56)
-      .setTint(0xf3ebe0)
-      .setAlpha(0.85);
-    const clipTitle = this.add
-      .text(0, -8, "OSDR notes", {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "11px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 4, y: 2 },
-      })
-      .setOrigin(0.5);
-    const clipHint = this.add
-      .text(0, 16, "tap", {
-        fontFamily: THEME.font,
-        fontSize: "10px",
-        color: THEME.inkSoft,
-      })
-      .setOrigin(0.5);
-    clip.add([board, clipTitle, clipHint]);
-    clip.setSize(100, 70);
-    clip.setInteractive(new Phaser.Geom.Rectangle(-50, -40, 100, 80), Phaser.Geom.Rectangle.Contains);
-    clip.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      p.event.stopPropagation();
-      this.openOsdrClipboard();
-    });
-
     this.addStation(
       new JobStation(this, {
         id: "analyzer",
@@ -448,12 +386,14 @@ export class IndoorScene extends Phaser.Scene {
         y: worldY(0.62),
         label: "Sample analyzer",
         costs: [{ icon: "⚡", value: -SCIENCE_COST_PER_LEVEL }],
-        benefits: [{ icon: "🔬", value: `+${sciPts}` }],
+        benefits: [
+          {
+            icon: "🔬",
+            value: `+${sciPts} ${bridge().ready() && bridge().getState().site === "plain" ? "plain" : "ridge"}`,
+          },
+        ],
         accept: "chip",
         chipCost: 1,
-        artKey: this.textures.exists("terminal") ? "terminal" : "sampleAnalyzer",
-        artW: 56,
-        artH: 48,
         getOn: () => bridge().getDecisions().scienceLevel > 0,
         onDrop: () => {
           const d = bridge().getDecisions();
@@ -470,13 +410,32 @@ export class IndoorScene extends Phaser.Scene {
           sparkBurst(this, worldX(0.5), worldY(0.55), 0x7ec8ff);
           floatNumber(this, worldX(0.5), worldY(0.52), `🔬+${sciPts}`, THEME.sageInk);
           this.guide.explainJob(
-            `Analyzer run (−1 chip). Effect tonight: science +${sciPts}.`,
+            `Analyzer (−1 chip). Tonight +${sciPts} science at this site (plain 2 · ridge 1.5).`,
           );
           this.afterJob();
           return true;
         },
       }),
     );
+  }
+
+  /** Lab rail button — opens the real NASA plant-study note. */
+  private addNotesButton() {
+    const btn = this.add
+      .text(10, 280, "Plant notes", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "13px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 8, y: 6 },
+      })
+      .setDepth(101)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    btn.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      p.event.stopPropagation();
+      this.openOsdrClipboard();
+    });
   }
 
   private openOsdrClipboard() {
@@ -662,6 +621,7 @@ export class IndoorScene extends Phaser.Scene {
 
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(false);
+    this.siteBadge.refresh(false);
     this.guide.syncFromBridge();
     this.syncLegend();
 

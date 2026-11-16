@@ -6,7 +6,6 @@ import {
   ensureSoftPadTexture,
   fadeSlideIn,
   floatNumber,
-  pulseDoorGlow,
   reduceMotion,
   shieldShimmer,
   sparkBurst,
@@ -15,6 +14,8 @@ import {
 } from "../anim";
 import { HUB, HUB_ART_KEY, uvToWorld } from "../hubLayout";
 import { ChipTray } from "../ui/ChipTray";
+import { SiteBadge } from "../ui/SiteBadge";
+import { siteShortName } from "../siteCopy";
 import { JobLegend } from "../ui/JobLegend";
 import { PlaceHud } from "../ui/PlaceHud";
 import { paintSideRail, WORLD_H, WORLD_W, worldX, worldY } from "../ui/railLayout";
@@ -66,6 +67,7 @@ export class BaseWorldScene extends Phaser.Scene {
   private dishImg: Phaser.GameObjects.Image | null = null;
   private dishSpin: Phaser.Tweens.Tween | null = null;
   private chipTray!: ChipTray;
+  private siteBadge!: SiteBadge;
   private legend!: JobLegend;
   private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
@@ -148,9 +150,9 @@ export class BaseWorldScene extends Phaser.Scene {
       .setAlpha(0.92);
 
     // Soft door footprints — tap the painted door, or use Places on the left.
-    this.addDoorHotspot("home", HUB.homeDoor, 0xf0a070);
-    this.addDoorHotspot("greenhouse", HUB.greenhouseDoor, 0x8fa887);
-    this.addDoorHotspot("lab", HUB.labDoor, 0x7aa7c4);
+    this.addDoorHotspot("home", HUB.homeDoor);
+    this.addDoorHotspot("greenhouse", HUB.greenhouseDoor);
+    this.addDoorHotspot("lab", HUB.labDoor);
 
     // Dish spins only after the radio is on. No extra panel cutout on the painting.
     const dishPos = uvToWorld(HUB.dish);
@@ -165,12 +167,13 @@ export class BaseWorldScene extends Phaser.Scene {
       .image(home.x, home.y - 36, "softPad")
       .setDisplaySize(90, 48)
       .setTint(0x7ec8ff)
-      .setAlpha(0.12)
+      .setAlpha(0)
       .setDepth(5);
 
     this.buildOutdoorJobs();
     this.buildMaterialCrates();
 
+    this.siteBadge = new SiteBadge(this);
     this.chipTray = new ChipTray(this);
     this.chipTray.setDrag(this.drag);
     this.guide = new NovaGuide(this, this.drag);
@@ -241,17 +244,14 @@ export class BaseWorldScene extends Phaser.Scene {
   private addDoorHotspot(
     room: "home" | "greenhouse" | "lab",
     uv: { u: number; v: number },
-    tint: number,
   ) {
     const { x, y } = uvToWorld(uv);
     const glow = this.add
       .image(x, y + 6, "softPad")
       .setDisplaySize(72, 28)
-      .setTint(tint)
-      .setAlpha(0.45)
+      .setAlpha(0.01)
       .setDepth(9)
       .setInteractive({ useHandCursor: true });
-    pulseDoorGlow(this, glow);
     glow.on("pointerdown", (p: Phaser.Input.Pointer) => {
       p.event.stopPropagation();
       this.enterRoom(room);
@@ -365,7 +365,12 @@ export class BaseWorldScene extends Phaser.Scene {
           { icon: "⚡", value: -SCIENCE_COST_PER_LEVEL },
           { icon: "⚠", value: "+risk" },
         ],
-        benefits: [{ icon: "🔬", value: `+${sciPts}` }],
+        benefits: [
+          {
+            icon: "🔬",
+            value: `+${sciPts} ${bridge().ready() && bridge().getState().site === "plain" ? "plain" : "ridge"}`,
+          },
+        ],
         accept: "chip",
         chipCost: 1,
         getOn: () => bridge().getDecisions().scienceLevel > 0,
@@ -383,11 +388,18 @@ export class BaseWorldScene extends Phaser.Scene {
           bridge().patchDecisions({ scienceLevel: next });
           floatNumber(this, rover.x, rover.y - 36, `🔬+${sciPts}`, THEME.sageInk);
           const storm = bridge().getEvent()?.stormSeverity !== undefined;
-          this.guide.explainJob(
-            storm
-              ? `Science walk: +${sciPts} science, −1 chip, MORE storm risk tonight.`
-              : `Science walk: +${sciPts} science tonight, −1 chip. Extra risk if a storm hits.`,
-          );
+          {
+            const site = bridge().getState().site;
+            const other =
+              site === "plain"
+                ? `ridge only +${SCIENCE_POINTS_RIM}`
+                : `plain would +${SCIENCE_POINTS_PLAIN}`;
+            this.guide.explainJob(
+              storm
+                ? `${siteShortName(site)} walk: +${sciPts} sci (${other}), −1 chip, MORE storm risk.`
+                : `${siteShortName(site)} walk: +${sciPts} science tonight (${other}). −1 chip.`,
+            );
+          }
           this.afterJob();
           return true;
         },
@@ -621,6 +633,7 @@ export class BaseWorldScene extends Phaser.Scene {
 
     this.chipTray.setHeldExtra(this.heldTotal());
     this.chipTray.refresh(false);
+    this.siteBadge.refresh(false);
     this.refreshWorldFx(false);
     this.guide.syncFromBridge();
     this.syncLegend();

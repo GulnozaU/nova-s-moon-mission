@@ -87,8 +87,8 @@ export class GuideCoach {
     }
 
     // Convert world → screen if camera scrolled (we use fixed camera).
-    this.glow.setPosition(pos.x, pos.y).setVisible(true);
-    this.arrow.setPosition(pos.x, pos.y - 42).setVisible(true);
+    this.glow.setPosition(pos.x, pos.y).setVisible(false);
+    this.arrow.setPosition(pos.x, pos.y - 28).setVisible(true);
     this.root.setScrollFactor(0);
 
     // Re-parent glow/arrow in world space (not HUD scrollFactor).

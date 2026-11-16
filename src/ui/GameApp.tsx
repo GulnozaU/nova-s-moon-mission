@@ -15,6 +15,7 @@ import { EndReport } from "./teach/EndReport";
 import { SpaceText } from "./teach/SpaceText";
 import type { PlayMode } from "../game/bridge";
 import { DemoDirector, isDemoMode } from "../demo/DemoDirector";
+import { sitePickTrade } from "../game/siteCopy";
 import "./game.css";
 
 /**
@@ -208,17 +209,15 @@ export function GameApp() {
                         : "Dark for half the time"}
                     </p>
                     <p className="site-card__trade">
-                      {site.id === "rim" ? (
-                        <>
-                          <span className="helps">↑ Helps: steadier power</span>
-                          <span className="costs">↓ Costs: less science each walk</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="helps">↑ Helps: more science</span>
-                          <span className="costs">↓ Costs: dark nights, little power</span>
-                        </>
-                      )}
+                      {(() => {
+                        const trade = sitePickTrade(site.id as "rim" | "plain");
+                        return (
+                          <>
+                            <span className="helps">{trade.helps}</span>
+                            <span className="costs">{trade.costs}</span>
+                          </>
+                        );
+                      })()}
                     </p>
                     <details className="how-know">
                       <summary>How do we know?</summary>

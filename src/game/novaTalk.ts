@@ -1,4 +1,9 @@
-import { SCIENCE_SUCCESS_TARGET } from "../engine/constants";
+import {
+  PLAIN_LIT_DAYS,
+  PLAIN_NIGHT_POWER,
+  SCIENCE_POINTS_PLAIN,
+  SCIENCE_SUCCESS_TARGET,
+} from "../engine/constants";
 import type { DayDecisions } from "../engine/types";
 import type { Event, GameState } from "../types";
 import type { StormAlert } from "../content/schedule";
@@ -39,6 +44,51 @@ export function morningTalk(
   const day = state.day;
   const stormToday = event?.stormSeverity !== undefined;
   const scienceLeft = Math.max(0, SCIENCE_SUCCESS_TARGET - state.science);
+
+  // Plain site: last sunny day / first dark night — make the place rule loud.
+  if (state.site === "plain" && day === PLAIN_LIT_DAYS && !stormToday) {
+    return {
+      goal: clipWords(`Day ${day}: last sunny day on the plain.`),
+      story: clipWords(
+        `Tomorrow solar chips drop to ~${PLAIN_NIGHT_POWER}. Bank battery tonight. Walks still give +${SCIENCE_POINTS_PLAIN} science.`,
+      ),
+      choices: [
+        {
+          id: "bank",
+          label: "Save chips for night",
+          hint: "Skip extra science walks — leave free chips for the battery.",
+        },
+        {
+          id: "science_now",
+          label: "Walk for science now",
+          hint: `Plain walks still +${SCIENCE_POINTS_PLAIN}. Spend chips while the sun is up.`,
+          patch: { scienceLevel: 1 },
+        },
+      ],
+    };
+  }
+  if (state.site === "plain" && day === PLAIN_LIT_DAYS + 1 && !stormToday) {
+    return {
+      goal: clipWords(`Day ${day}: plain night — few solar chips.`),
+      story: clipWords(
+        `Dark mare night: ~${PLAIN_NIGHT_POWER} solar chips (+ battery). Ridge would still be sunny. Spend carefully.`,
+      ),
+      choices: [
+        {
+          id: "life",
+          label: "Life support only",
+          hint: "Chip cleaner and air. Skip costly walks tonight.",
+          patch: { recycler: true, oxygenMaker: true },
+        },
+        {
+          id: "still_walk",
+          label: "Still walk for science",
+          hint: `Walks still +${SCIENCE_POINTS_PLAIN} here — if you can spare a chip.`,
+          patch: { scienceLevel: 1 },
+        },
+      ],
+    };
+  }
 
   // Day 2: teach greenhouse after the short Day-1 coach.
   if (day === 2 && !stormToday) {

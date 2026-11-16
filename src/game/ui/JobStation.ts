@@ -65,15 +65,8 @@ export class JobStation {
     this.root = scene.add.container(opts.x, opts.y).setDepth(14);
     this.pad = scene.add
       .image(0, 8, padKey)
-      .setDisplaySize(this.radius * 2.4, this.radius * 1.35)
-      .setAlpha(0.7);
-
-    if (opts.artKey && scene.textures.exists(opts.artKey)) {
-      this.prop = scene.add
-        .image(0, -6, opts.artKey)
-        .setDisplaySize(opts.artW ?? 48, opts.artH ?? 40)
-        .setOrigin(0.5, 0.85);
-    }
+      .setDisplaySize(this.radius * 2.2, this.radius * 1.1)
+      .setAlpha(0);
 
     this.label = scene.add
       .text(0, -this.radius - (this.prop ? 18 : 4), opts.label, {
@@ -112,15 +105,7 @@ export class JobStation {
       })
       .setOrigin(0.5);
 
-    const kids: Phaser.GameObjects.GameObject[] = [
-      this.pad,
-      this.label,
-      this.costText,
-      this.onBadge,
-      this.fillText,
-    ];
-    if (this.prop) kids.splice(1, 0, this.prop);
-    this.root.add(kids);
+    this.root.add([this.pad, this.label, this.costText, this.onBadge, this.fillText]);
     // Names and costs live in the side rail so the painting stays clear.
     this.label.setVisible(false);
     this.costText.setVisible(false);
@@ -157,9 +142,7 @@ export class JobStation {
   }
 
   setHighlight(on: boolean) {
-    this.pad.setTint(on ? 0xffe08a : 0xffffff);
-    this.pad.setAlpha(on ? 0.95 : 0.7);
-    if (this.prop) this.prop.setScale(on ? 1.08 : 1);
+    this.pad.setAlpha(on ? 0.35 : 0);
   }
 
   receive(payload: DragPayload): boolean {
@@ -172,9 +155,7 @@ export class JobStation {
     this.root.setVisible(available);
     const on = this.opts.getOn();
     this.onBadge.setText(on ? "ON" : "");
-    this.pad.setTint(on ? 0xb8e0a8 : 0xffffff);
-    this.pad.setAlpha(on ? 0.9 : 0.65);
-    if (this.prop) this.prop.setAlpha(on ? 1 : 0.92);
+    this.pad.setAlpha(0);
     const need = this.opts.chipCost ?? 0;
     const fill = this.opts.getFill?.() ?? 0;
     if (!on && need > 1) {

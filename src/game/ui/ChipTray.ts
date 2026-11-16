@@ -5,110 +5,99 @@ import {
   HEAT_COST,
   SCIENCE_SUCCESS_TARGET,
 } from "../../engine/constants";
+import { siteShortName } from "../siteCopy";
 import { THEME } from "../theme";
 import type { DragController } from "../drag/DragController";
 
 /**
- * Clear power-chip tray — big yellow “DRAG THESE” strip so kids see the inventory.
+ * Energy sits in the left column as bolt marks you can drag.
+ * Bolts are their own hit targets (not a photo inside a container), so the
+ * pointer actually lands on them.
  */
 export class ChipTray {
-  private root: Phaser.GameObjects.Container;
+  private scene: Phaser.Scene;
+  private originX: number;
+  private originY: number;
   private title: Phaser.GameObjects.Text;
-  private hint: Phaser.GameObjects.Text;
-  private cells: Phaser.GameObjects.Image[] = [];
-  private cellHit: Phaser.GameObjects.Zone[] = [];
+  private bolts: Phaser.GameObjects.Text[] = [];
   private meta: Phaser.GameObjects.Text;
+  private water: Phaser.GameObjects.Text | null = null;
   private lastKey = "";
   private drag: DragController | null = null;
   private heldExtra = 0;
-  constructor(scene: Phaser.Scene, x = 10, y = 128) {
-    this.root = scene.add.container(x, y).setDepth(100).setScrollFactor(0);
 
-    const bg = scene.add
-      .rectangle(0, 0, 232, 100, 0xfff3c4, 0.98)
-      .setOrigin(0, 0)
-      .setStrokeStyle(3, THEME.line, 0.45);
-    this.root.add(bg);
+  constructor(scene: Phaser.Scene, x = 10, y = 170) {
+    this.scene = scene;
+    this.originX = x;
+    this.originY = y;
 
-    this.title = scene.add.text(8, 4, "Yellow chips", {
-      fontFamily: THEME.fontDisplay,
-      fontSize: "13px",
-      color: THEME.ink,
-    });
-    this.root.add(this.title);
-
-    this.hint = scene.add.text(8, 20, "Drag a bright one onto a glow", {
-      fontFamily: THEME.font,
-      fontSize: "11px",
-      color: THEME.inkSoft,
-    });
-    this.root.add(this.hint);
-
-    if (
-      !scene.textures.exists("chip") &&
-      !scene.textures.exists("chipSoft") &&
-      !scene.textures.exists("zap")
-    ) {
-      const g = scene.make.graphics({ x: 0, y: 0 }, false);
-      g.fillStyle(0xffe08a, 1);
-      g.fillRoundedRect(1, 1, 16, 20, 3);
-      g.lineStyle(2, 0x3a3348, 0.45);
-      g.strokeRoundedRect(1, 1, 16, 20, 3);
-      g.generateTexture("chipSoft", 18, 22);
-      g.destroy();
-    }
-    const chipKey = scene.textures.exists("chip")
-      ? "chip"
-      : scene.textures.exists("zap")
-        ? "zap"
-        : "chipSoft";
+    this.title = scene.add
+      .text(x, y, "Energy", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "14px",
+        color: THEME.ink,
+      })
+      .setDepth(101)
+      .setScrollFactor(0);
 
     for (let i = 0; i < 16; i++) {
       const col = i % 8;
       const row = Math.floor(i / 8);
-      const cx = 16 + col * 26;
-      const cy = 42 + row * 22;
-      const cell = scene.add
-        .image(cx, cy, chipKey)
-        .setDisplaySize(20, 20)
+      const bolt = scene.add
+        .text(x + 12 + col * 26, y + 24 + row * 26, "⚡", {
+          fontFamily: THEME.font,
+          fontSize: "20px",
+        })
+        .setOrigin(0.5)
+        .setDepth(102)
+        .setScrollFactor(0)
         .setVisible(false);
-      const zone = scene.add.zone(cx, cy, 22, 24);
-      zone.setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      const index = i;
+      bolt.on("pointerdown", (p: Phaser.Input.Pointer) => {
         if (!this.drag || !bridge().ready()) return;
-        const left = this.freeChips();
-        if (i >= left) return;
+        if (index >= this.freeChips()) return;
         p.event.stopPropagation();
         this.drag.begin(
-          { kind: "chip", amount: 1, sourceId: `chip-${i}` },
-          p.worldX,
-          p.worldY,
+          { kind: "chip", amount: 1, sourceId: `chip-${index}` },
+          p.x,
+          p.y,
         );
       });
-      this.root.add(cell);
-      this.root.add(zone);
-      this.cells.push(cell);
-      this.cellHit.push(zone);
+      this.bolts.push(bolt);
     }
 
-    this.meta = scene.add.text(8, 82, "", {
-      fontFamily: THEME.font,
-      fontSize: "11px",
-      color: THEME.ink,
-      wordWrap: { width: 216 },
-    });
-    this.root.add(this.meta);
-
-    // Soft pulse so the tray is noticed on Day 1.
-    scene.tweens.add({
-      targets: bg,
-      alpha: { from: 0.92, to: 1 },
-      duration: 700,
-      yoyo: true,
-      repeat: 4,
-    });
+    this.meta = scene.add
+      .text(x, y + 78, "", {
+        fontFamily: THEME.font,
+        fontSize: "11px",
+        color: THEME.inkSoft,
+        wordWrap: { width: 220 },
+      })
+      .setDepth(101)
+      .setScrollFactor(0);
 
     this.refresh(true);
+  }
+
+  /** Greenhouse water. A drop in the left column, not a picture on the plants. */
+  showWater(amount: number) {
+    if (this.water) return;
+    const drop = this.scene.add
+      .text(this.originX, this.originY + 78, "💧  water", {
+        fontFamily: THEME.font,
+        fontSize: "16px",
+        color: THEME.ink,
+      })
+      .setDepth(102)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    drop.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      if (!this.drag) return;
+      p.event.stopPropagation();
+      this.drag.begin({ kind: "water", amount }, p.x, p.y, 0x3a7ca5);
+    });
+    this.water = drop;
+    this.meta.setY(this.originY + 104);
   }
 
   setDrag(drag: DragController) {
@@ -132,41 +121,35 @@ export class ChipTray {
     const spent = plannedPowerCost(bridge().getDecisions());
     const left = Math.max(0, power - spent - this.heldExtra);
     const s = bridge().getState();
-    const key = `${s.day}|${power}|${left}|${spent}|${this.heldExtra}|${s.science}|${s.water}|${s.oxygen}|${s.battery}|${s.materials}`;
+    const key = `${s.site}|${s.day}|${power}|${left}|${spent}|${this.heldExtra}|${s.science}|${s.water}|${s.oxygen}|${s.battery}|${s.materials}`;
     if (!force && key === this.lastKey) return;
     this.lastKey = key;
 
-    this.title.setText(left > 0 ? `Chips · ${left} free` : `Chips · none free`);
-    this.hint.setText(
+    this.title.setText(
       left > 0
-        ? `Day ${s.day}/10 · drag a yellow chip`
-        : `Day ${s.day}/10 · heat keeps −${HEAT_COST}`,
+        ? `Energy · ${left} · ${siteShortName(s.site)}`
+        : `Energy · heat uses ${HEAT_COST}`,
     );
 
-    for (let i = 0; i < this.cells.length; i++) {
-      const cell = this.cells[i]!;
-      const zone = this.cellHit[i]!;
+    for (let i = 0; i < this.bolts.length; i++) {
+      const bolt = this.bolts[i]!;
       if (i >= power) {
-        cell.setVisible(false);
-        zone.disableInteractive();
+        bolt.setVisible(false);
+        bolt.disableInteractive();
         continue;
       }
-      cell.setVisible(true);
+      bolt.setVisible(true);
       if (i < left) {
-        cell.setTint(0xffffff);
-        cell.setAlpha(1);
-        cell.setScale(1.05);
-        zone.setInteractive({ useHandCursor: true });
+        bolt.setAlpha(1);
+        bolt.setInteractive({ useHandCursor: true });
       } else {
-        cell.setTint(0x888888);
-        cell.setAlpha(0.4);
-        cell.setScale(0.9);
-        zone.disableInteractive();
+        bolt.setAlpha(0.28);
+        bolt.disableInteractive();
       }
     }
 
     this.meta.setText(
-      `Sci ${s.science}/${SCIENCE_SUCCESS_TARGET}  💧${s.water}  O₂${s.oxygen}  📦${s.materials}  bat ${s.battery}`,
+      `Day ${s.day}/10 · Sci ${s.science}/${SCIENCE_SUCCESS_TARGET}  💧${s.water}  O₂${s.oxygen}  📦${s.materials}  bat ${s.battery}`,
     );
   }
 }

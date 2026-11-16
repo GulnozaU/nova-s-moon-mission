@@ -37,30 +37,16 @@ export class DragController {
     this.active = true;
     this.dragging = true;
     const g = this.scene.add.container(x, y).setDepth(200);
-    const tex = ghostTexture(this.scene, payload.kind);
-    const body = tex
-      ? this.scene.add.image(0, 0, tex).setDisplaySize(
-          payload.kind === "chip" ? 22 : 36,
-          payload.kind === "chip" ? 22 : 32,
-        )
-      : payload.kind === "chip"
-        ? this.scene.add.rectangle(0, 0, 18, 26, color, 0.95).setStrokeStyle(2, 0x3a3348, 0.5)
-        : payload.kind === "material"
-          ? this.scene.add.rectangle(0, 0, 28, 22, 0xb08968, 0.95).setStrokeStyle(2, 0x3a3348, 0.45)
-          : payload.kind === "water"
-            ? this.scene.add.ellipse(0, 0, 16, 22, 0x3a7ca5, 0.95)
-            : this.scene.add.circle(0, 0, 14, 0xffe08a, 0.9);
-    g.add(body);
-    if (!tex) {
-      const tag = this.scene.add
-        .text(0, 0, labelFor(payload.kind), {
-          fontFamily: "Pixelify Sans, Nunito, sans-serif",
-          fontSize: "10px",
-          color: "#fff8ef",
-        })
-        .setOrigin(0.5);
-      g.add(tag);
-    }
+    const mark = this.scene.add
+      .text(0, 0, labelFor(payload.kind), {
+        fontFamily: "Nunito, sans-serif",
+        fontSize: payload.kind === "nova" ? "16px" : "28px",
+        color: payload.kind === "water" ? "#1a1410" : "#3a3348",
+      })
+      .setOrigin(0.5);
+    if (payload.kind === "material") mark.setColor("#6a4a32");
+    g.add(mark);
+    void color;
     this.ghost = g;
     audio.play("pick");
   }
@@ -105,17 +91,6 @@ export class DragController {
     this.ghost?.destroy(true);
     this.ghost = null;
   }
-}
-
-function ghostTexture(
-  scene: Phaser.Scene,
-  kind: DragPayload["kind"],
-): string | null {
-  if (kind === "chip" && scene.textures.exists("chip")) return "chip";
-  if (kind === "material" && scene.textures.exists("crates")) return "crates";
-  if (kind === "water" && scene.textures.exists("waterDrop")) return "waterDrop";
-  if (kind === "nova" && scene.textures.exists("nova")) return "nova";
-  return null;
 }
 
 function labelFor(kind: DragPayload["kind"]): string {

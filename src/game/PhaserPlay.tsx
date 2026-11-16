@@ -217,11 +217,6 @@ export function PhaserPlay({
       aria-hidden={!visible}
     >
       <div className="phaser-play__canvas" ref={hostRef} />
-      {visible ? (
-        <p className="phaser-play__hint">
-          Places, chips, and Nova stay on the left. Tap Home, Plants, or Lab to go inside.
-        </p>
-      ) : null}
     </section>
   );
 }
