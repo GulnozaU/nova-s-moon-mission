@@ -266,11 +266,13 @@ export function GameApp() {
             commsYesterday={g.commsYesterday}
             novaLine={g.novaLine}
             sheltering={g.sheltering}
+            osdrStudy={g.greenhouseStudy}
             visible={playVisible}
             onDecisions={g.setDecisions}
             onNovaLine={g.setNovaLine}
             onSheltering={g.setSheltering}
             onEndDay={g.endDayFromWorld}
+            onContinueAfterResult={g.continueAfterResult}
             onOpenGlossary={() => g.setGlossaryOpen(true)}
           />
         ) : null}

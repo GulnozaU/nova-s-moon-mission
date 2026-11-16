@@ -2,8 +2,8 @@
  * Procedural Web Audio for Nova's Moon Mission.
  * One module for React + Phaser. No downloaded sound files.
  *
- * Unlock after the first user gesture (Start mission). Master default 0.5.
- * SFX stay within ~6 dB of the ambient bed. Rate-limited to 4 plays / second / id.
+ * Unlock after the first user gesture (Start mission). Master default 0.75.
+ * No ambient pad (was a vibrating bass). Clicks/SFX only. Max 4 plays / sec / id.
  */
 
 export type SfxId =
@@ -23,18 +23,24 @@ export type SfxId =
   | "typewriter"
   | "stormAlert"
   | "stormHit"
+  | "stormRumble"
   | "shelterClose"
   | "dayStart"
   | "dayEnd"
+  | "dayJingle"
+  | "pick"
+  | "drop"
+  | "jobDone"
   | "missionSuccess"
   | "missionFail";
 
 const MUTE_KEY = "nova-mute";
-const MASTER_DEFAULT = 0.72;
-/** Ambient bed gain (pre-master). Soft pad under everything. */
-const AMBIENT_GAIN = 0.18;
-/** Loudest SFX relative to ambient: +6 dB ≈ ×2. */
-const SFX_CEILING = AMBIENT_GAIN * 2;
+const MASTER_DEFAULT = 0.75;
+/**
+ * No looping ambient pad (users heard it as a vibrating bass).
+ * SFX gains are absolute (pre-master); keep clicks clear.
+ */
+const SFX_CEILING = 0.45;
 const MAX_PER_SEC = 4;
 const WINDOW_MS = 1000;
 
@@ -99,7 +105,7 @@ class AudioEngine {
 
   /**
    * Call from the first user gesture (Start mission / Got it).
-   * Creates AudioContext and starts the quiet ambient pad.
+   * Creates AudioContext. No ambient loop — clicks/SFX only.
    */
   unlock(): void {
     if (typeof window === "undefined") return;
@@ -111,7 +117,7 @@ class AudioEngine {
     this.unlocked = true;
     this.bindVisibility();
     this.applyGains();
-    this.startAmbient();
+    this.stopAmbient();
     this.emit();
   }
 
@@ -121,10 +127,8 @@ class AudioEngine {
     this.applyGains();
     if (!muted && this.unlocked) {
       void this.ctx?.resume();
-      this.startAmbient();
-    } else if (muted) {
-      this.stopAmbient();
     }
+    this.stopAmbient();
     this.emit();
   }
 
@@ -180,7 +184,8 @@ class AudioEngine {
         this.blip(t0 + 0.05, 280, 0.09, g * 0.4, "sine");
         break;
       case "powerHum":
-        this.hum(t0, 90, 0.35, g * 0.55);
+        // Soft mid click — not a low bass hum.
+        this.blip(t0, 520, 0.08, g * 0.7, "sine");
         break;
       case "waterTrickle":
         this.noiseBurst(t0, 0.22, g * 0.4, 1800, 0.3);
@@ -205,7 +210,13 @@ class AudioEngine {
         this.pulseTone(t0, 320, 0.9, g * 0.5);
         break;
       case "stormHit":
-        this.rumble(t0, 1.1, g * 0.65);
+        this.blip(t0, 180, 0.15, g * 0.6, "triangle");
+        this.blip(t0 + 0.08, 140, 0.2, g * 0.45, "sine");
+        break;
+      case "stormRumble":
+        // Soft mid rumble — not a bass pad (short noise only).
+        this.noiseBurst(t0, 0.35, g * 0.4, 480, 0.25);
+        this.blip(t0 + 0.05, 200, 0.2, g * 0.35, "triangle");
         break;
       case "shelterClose":
         this.blip(t0, 140, 0.12, g * 0.55, "triangle");
@@ -216,6 +227,19 @@ class AudioEngine {
         break;
       case "dayEnd":
         this.chime(t0, [523, 440, 349], g * 0.55);
+        break;
+      case "dayJingle":
+        this.chime(t0, [392, 494, 587, 784], g * 0.65);
+        break;
+      case "pick":
+        this.blip(t0, 640, 0.04, g * 0.7, "sine");
+        break;
+      case "drop":
+        this.blip(t0, 480, 0.05, g * 0.65, "triangle");
+        this.blip(t0 + 0.04, 360, 0.06, g * 0.45, "triangle");
+        break;
+      case "jobDone":
+        this.chime(t0, [523, 784], g * 0.6);
         break;
       case "missionSuccess":
         this.chime(t0, [392, 523, 659, 784, 988], g * 0.75);
@@ -230,31 +254,35 @@ class AudioEngine {
   }
 
   private gainFor(id: SfxId): number {
-    // Relative to ambient; never exceed SFX_CEILING.
     const table: Record<SfxId, number> = {
-      uiClick: 0.55,
-      uiHover: 0.35,
-      toggleOn: 0.65,
-      toggleOff: 0.55,
+      uiClick: 0.85,
+      uiHover: 0.45,
+      toggleOn: 0.9,
+      toggleOff: 0.75,
       success: 0.85,
-      resourceUp: 0.6,
-      resourceDown: 0.55,
-      powerHum: 0.7,
-      waterTrickle: 0.6,
-      airHiss: 0.55,
-      plantSparkle: 0.55,
-      footstep: 0.4,
-      door: 0.65,
-      typewriter: 0.3,
-      stormAlert: 0.7,
-      stormHit: 0.95,
+      resourceUp: 0.7,
+      resourceDown: 0.65,
+      powerHum: 0.35, // short soft blip only — no bass bed
+      waterTrickle: 0.55,
+      airHiss: 0.5,
+      plantSparkle: 0.65,
+      footstep: 0.35,
+      door: 0.8,
+      typewriter: 0.4,
+      stormAlert: 0.45,
+      stormHit: 0.55, // keep gentle; was a rumbling bass
+      stormRumble: 0.4,
       shelterClose: 0.7,
-      dayStart: 0.8,
-      dayEnd: 0.75,
-      missionSuccess: 1,
-      missionFail: 0.9,
+      dayStart: 0.7,
+      dayEnd: 0.65,
+      dayJingle: 0.7,
+      pick: 0.75,
+      drop: 0.7,
+      jobDone: 0.75,
+      missionSuccess: 0.9,
+      missionFail: 0.75,
     };
-    return Math.min(SFX_CEILING, AMBIENT_GAIN * (table[id] ?? 0.6) * 2);
+    return Math.min(SFX_CEILING, table[id] ?? 0.6);
   }
 
   private allow(id: SfxId): boolean {
@@ -310,67 +338,9 @@ class AudioEngine {
     });
   }
 
+  /** Ambient pad disabled — was a vibrating bass under the whole mission. */
   private startAmbient() {
-    if (!this.ctx || !this.musicBus || this.muted || this.hidden) return;
-    if (this.ambientNodes) return;
-    const ctx = this.ctx;
-    const bus = this.musicBus;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 480;
-    filter.Q.value = 0.7;
-
-    const gain = ctx.createGain();
-    gain.gain.value = AMBIENT_GAIN;
-
-    const o1 = ctx.createOscillator();
-    o1.type = "sine";
-    o1.frequency.value = 110;
-    const o2 = ctx.createOscillator();
-    o2.type = "sine";
-    o2.frequency.value = 164.5;
-    const o3 = ctx.createOscillator();
-    o3.type = "triangle";
-    o3.frequency.value = 55;
-
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.07;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.025;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
-
-    o1.connect(filter);
-    o2.connect(filter);
-    o3.connect(filter);
-    filter.connect(gain);
-    gain.connect(bus);
-
-    const t = ctx.currentTime;
-    o1.start(t);
-    o2.start(t);
-    o3.start(t);
-    lfo.start(t);
-
-    this.ambientNodes = {
-      stop: () => {
-        try {
-          o1.stop();
-          o2.stop();
-          o3.stop();
-          lfo.stop();
-        } catch {
-          /* */
-        }
-        try {
-          gain.disconnect();
-          filter.disconnect();
-        } catch {
-          /* */
-        }
-      },
-    };
+    /* no-op */
   }
 
   private stopAmbient() {
@@ -405,21 +375,6 @@ class AudioEngine {
     });
   }
 
-  private hum(t0: number, freq: number, dur: number, gain: number) {
-    if (!this.ctx || !this.sfxBus) return;
-    const o = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g);
-    g.connect(this.sfxBus);
-    o.start(t0);
-    o.stop(t0 + dur + 0.02);
-  }
-
   private pulseTone(t0: number, freq: number, dur: number, gain: number) {
     if (!this.ctx || !this.sfxBus) return;
     const o = this.ctx.createOscillator();
@@ -437,33 +392,6 @@ class AudioEngine {
     g.connect(this.sfxBus);
     o.start(t0);
     o.stop(t0 + dur + 0.05);
-  }
-
-  private rumble(t0: number, dur: number, gain: number) {
-    if (!this.ctx || !this.sfxBus) return;
-    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      last = (last + 0.02 * white) / 1.02;
-      data[i] = last * 3.5;
-    }
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 180;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(filter);
-    filter.connect(g);
-    g.connect(this.sfxBus);
-    src.start(t0);
-    src.stop(t0 + dur + 0.02);
   }
 
   private noiseBurst(

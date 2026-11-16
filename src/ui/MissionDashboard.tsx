@@ -168,7 +168,7 @@ export function MissionDashboard({
             Nova&apos;s Moon Mission
           </div>
           <div className="dash-meters">
-            <Meter icon={ART.iconZap} label="Power" value={state.battery} max={20} fill="var(--meter-power)" />
+            <Meter icon={ART.iconZap} label="Power" value={state.battery} max={12} fill="var(--meter-power)" />
             <Meter icon={ART.iconWater} label="Water" value={state.water} max={40} fill="var(--meter-water)" />
             <Meter icon={ART.iconLeaf} label="O₂" value={state.oxygen} max={30} fill="var(--meter-o2)" />
             <Meter icon={ART.iconHeart} label="Risk" value={state.exposure} max={LOSE_EXPOSURE_AT} fill="var(--meter-risk)" />

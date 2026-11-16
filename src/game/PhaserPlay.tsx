@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import type { DayDecisions } from "../engine/types";
 import type { Event, GameState } from "../types";
 import type { SpaceWeatherResult } from "../data/donkiTypes";
+import type { OsdrStudy } from "../data/osdrTypes";
 import type { StormAlert } from "../content/schedule";
 import { plannedPowerCost } from "../ui/powerMath";
+import { listArchivedOsdrStudies } from "../data/osdr";
 import { moonBridgeRef, type BridgeDelta, type PlayMode } from "./bridge";
 import { createMoonGame } from "./createMoonGame";
 import "./phaser-play.css";
@@ -21,13 +23,34 @@ type Props = {
   commsYesterday: boolean;
   novaLine: string;
   sheltering: boolean;
+  osdrStudy: OsdrStudy | null;
   visible: boolean;
   onDecisions: (d: DayDecisions | ((p: DayDecisions) => DayDecisions)) => void;
   onNovaLine: (line: string) => void;
   onSheltering: (on: boolean) => void;
   onEndDay: () => BridgeDelta[];
+  onContinueAfterResult: () => void;
   onOpenGlossary: () => void;
 };
+
+function stormBrief(event: Event | null, alerts: StormAlert[]): string {
+  if (event?.stormSeverity !== undefined) {
+    const date = event.eventDate?.slice(0, 10) ?? "NASA date";
+    return `Storm day · NASA saw this on ${date}. Shelter cuts risk; science walks outside add risk.`;
+  }
+  if (alerts.length > 0) {
+    const a = alerts[0]!;
+    const date = a.eventDate?.slice(0, 10);
+    return `${a.message}${date ? ` · flare date ${date}` : ""} · warning window ~${a.warningDays} day(s).`;
+  }
+  return "No storm warning yet. Power the radio so Mission Control can call ahead.";
+}
+
+function preferOsdr476(study: OsdrStudy | null): OsdrStudy | null {
+  if (study?.id === "OSD-476") return study;
+  const archived = listArchivedOsdrStudies().find((s) => s.id === "OSD-476");
+  return archived ?? study;
+}
 
 /**
  * Full-canvas day loop. Created once per mission; stays mounted Day 1→end.
@@ -44,11 +67,13 @@ export function PhaserPlay({
   commsYesterday,
   novaLine,
   sheltering,
+  osdrStudy,
   visible,
   onDecisions,
   onNovaLine,
   onSheltering,
   onEndDay,
+  onContinueAfterResult,
   onOpenGlossary,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -65,10 +90,12 @@ export function PhaserPlay({
     commsYesterday,
     novaLine,
     sheltering,
+    osdrStudy,
     onDecisions,
     onNovaLine,
     onSheltering,
     onEndDay,
+    onContinueAfterResult,
     onOpenGlossary,
   });
 
@@ -85,10 +112,12 @@ export function PhaserPlay({
       commsYesterday,
       novaLine,
       sheltering,
+      osdrStudy,
       onDecisions,
       onNovaLine,
       onSheltering,
       onEndDay,
+      onContinueAfterResult,
       onOpenGlossary,
     };
   });
@@ -103,12 +132,15 @@ export function PhaserPlay({
         getPowerSpent: () => plannedPowerCost(latest.current.decisions),
         getState: () => latest.current.state,
         getEvent: () => latest.current.event,
-        getHint: () => "Stand still on a glowing circle. Bed ends the day.",
+        getHint: () => "Drag chips onto machines. Drag Nova into bed to end the day.",
         getDeltas: () => latest.current.deltas,
         getStormAlerts: () => latest.current.stormAlerts,
         getTomorrowHint: () => latest.current.tomorrowHint,
         getCommsYesterday: () => latest.current.commsYesterday,
         getNovaLine: () => latest.current.novaLine,
+        getOsdrStudy: () => preferOsdr476(latest.current.osdrStudy),
+        getStormBrief: () =>
+          stormBrief(latest.current.event, latest.current.stormAlerts),
         ready: () => true,
         patchDecisions: (patch) =>
           latest.current.onDecisions({
@@ -123,11 +155,10 @@ export function PhaserPlay({
         goPowerCheck: () => undefined,
         goChoice: () => undefined,
         choose: () => undefined,
-        continueAfterResult: () => undefined,
+        continueAfterResult: () => latest.current.onContinueAfterResult(),
         openGlossary: () => latest.current.onOpenGlossary(),
       };
     };
-    // onEndDay returns deltas for in-world floaters.
 
     wire();
     if (!hostRef.current || gameRef.current) return;
@@ -156,8 +187,12 @@ export function PhaserPlay({
       getCommsYesterday: () => latest.current.commsYesterday,
       getNovaLine: () => latest.current.novaLine,
       getSheltering: () => latest.current.sheltering,
+      getOsdrStudy: () => preferOsdr476(latest.current.osdrStudy),
+      getStormBrief: () =>
+        stormBrief(latest.current.event, latest.current.stormAlerts),
       ready: () => true,
       endDay: () => latest.current.onEndDay(),
+      continueAfterResult: () => latest.current.onContinueAfterResult(),
       setNovaLine: (line) => latest.current.onNovaLine(line),
       setSheltering: (on) => latest.current.onSheltering(on),
     };
@@ -173,6 +208,7 @@ export function PhaserPlay({
     commsYesterday,
     novaLine,
     sheltering,
+    osdrStudy,
   ]);
 
   return (
@@ -183,7 +219,7 @@ export function PhaserPlay({
       <div className="phaser-play__canvas" ref={hostRef} />
       {visible ? (
         <p className="phaser-play__hint">
-          Arrows / WASD or tap to walk · enter buildings · stand on circles · bed ends the day
+          Day 1: follow the bouncing arrow · later: talk with Nova each morning · drag Nova to bed
         </p>
       ) : null}
     </section>

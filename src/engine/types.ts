@@ -18,6 +18,11 @@ export type DayDecisions = {
    * Costs 1 material + 1 power from the day's pool / battery.
    */
   cleanFilter?: boolean;
+  /**
+   * Storm shelter: how many of 3 crew were dragged into Crew home (0..3).
+   * Blends sheltered/unsheltered storm exposure. ASSUMPTION (Stage jobs).
+   */
+  shelteredCrewCount?: number;
 };
 
 export type ApplyDayResult = {

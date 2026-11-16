@@ -2,25 +2,44 @@ import Phaser from "phaser";
 import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import { isDaylight } from "../../ui/teach/dayNight";
-import { plannedPowerCost } from "../../ui/powerMath";
 import { applyMovement, makeKeys, type ControlKeys } from "../playerControls";
 import {
   addShadow,
   dustPuff,
+  fadeSlideIn,
   floatNumber,
   idleBreathe,
   oxygenBubbles,
   paintMoonGround,
   panelGlow,
   reduceMotion,
-  setPlantHealth,
+  setPlantStage,
   shieldShimmer,
   sparkBurst,
   stormWarningPulse,
   twinkleStars,
   walkHop,
 } from "../anim";
-import { DwellCircle, STILL_SPEED } from "../dwellCircle";
+import { ChipTray } from "../ui/ChipTray";
+import { PlaceHud } from "../ui/PlaceHud";
+import { CrewTalk } from "../ui/CrewTalk";
+import { JobStation } from "../ui/JobStation";
+import { GuideCoach } from "../ui/GuideCoach";
+import { MorningTalk } from "../ui/MorningTalk";
+import {
+  StormCrewHud,
+  countSheltered,
+  type CrewShelterMap,
+} from "../ui/StormCrewHud";
+import { DragController } from "../drag/DragController";
+import {
+  advanceTutorial,
+  getCrewShelter,
+  getTutorial,
+  isTutorialActive,
+  resetTutorialForDay,
+  setCrewShelter,
+} from "../tutorial/session";
 import { THEME } from "../theme";
 import { createRng } from "../../engine/rng";
 import {
@@ -29,125 +48,145 @@ import {
   LOSE_WATER_AT,
   SCIENCE_COST_PER_LEVEL,
   SCIENCE_LEVEL_MAX,
-  SCIENCE_SUCCESS_TARGET,
+  SCIENCE_POINTS_PLAIN,
+  SCIENCE_POINTS_RIM,
+  SHIELD_MATERIAL_COST,
   START_OXYGEN,
   START_WATER,
 } from "../../engine/constants";
+import { plannedPowerCost } from "../../ui/powerMath";
+
+type Door = {
+  room: "home" | "greenhouse" | "lab";
+  x: number;
+  y: number;
+  r: number;
+};
 
 /**
- * Outdoor base: walk into buildings, shelter / science outdoors, bed ends the day.
- * Machines live inside rooms (IndoorScene).
+ * Compact Moon surface hub — drag chips/materials onto outdoor jobs.
  */
 export class BaseWorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private keys: ControlKeys | null = null;
   private shadowSync!: () => void;
   private walkSync!: () => void;
-  private circles: DwellCircle[] = [];
+  private doors: Door[] = [];
+  private stations: JobStation[] = [];
+  private drag!: DragController;
   private dishImg: Phaser.GameObjects.Image | null = null;
   private dishSpin: Phaser.Tweens.Tween | null = null;
   private panelsImg: Phaser.GameObjects.Image | null = null;
-  private panelTween: Phaser.Tweens.Tween | null = null;
   private plantLeaves: Phaser.GameObjects.Ellipse[] = [];
   private waterFill: Phaser.GameObjects.Rectangle | null = null;
   private oxyFill: Phaser.GameObjects.Rectangle | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
-  private powerHud!: Phaser.GameObjects.Container;
-  private powerTitle!: Phaser.GameObjects.Text;
-  private powerCells: Phaser.GameObjects.Rectangle[] = [];
-  private resourceHud!: Phaser.GameObjects.Text;
+  private chipTray!: ChipTray;
+  private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
   private alertPulse: Phaser.Tweens.Tween | null = null;
   private novaBubble!: Phaser.GameObjects.Text;
+  private shieldRing: Phaser.GameObjects.Arc | null = null;
+  private crateRoots: Phaser.GameObjects.Container[] = [];
   private lastFootstep = 0;
   private lastDay = -1;
   private ending = false;
   private walkTarget: { x: number; y: number } | null = null;
+  private doorCooldown = 0;
   private lastOxyOn: boolean | null = null;
   private lastGreenhouse: boolean | null = null;
-  private lastHudKey = "";
   private lastComms: boolean | null = null;
+  private lastShield = -1;
+  private spawnNear: string | null = null;
+  private fills: Record<string, number> = {};
+  private coach: GuideCoach | null = null;
+  private morning: MorningTalk | null = null;
+  private stormHud: StormCrewHud | null = null;
+  private homeDoorPos = { x: 0, y: 0 };
+  private radioPos = { x: 0, y: 0 };
 
   constructor() {
     super("base");
   }
 
+  init(data?: { spawnNear?: string }) {
+    this.spawnNear = data?.spawnNear ?? null;
+  }
+
   create() {
     const { width: W, height: H } = this.scale;
     this.ending = false;
-    this.lastHudKey = "";
-    this.circles = [];
-    this.powerCells = [];
-    this.dishSpin = null;
-    this.panelTween = null;
-    this.alertPulse = null;
-    this.bubbleTimer = null;
+    this.doors = [];
+    this.stations = [];
+    this.fills = {};
+    this.crateRoots = [];
+    this.doorCooldown = 400;
+    fadeSlideIn(this, false);
+    this.drag = new DragController(this);
 
     let night = false;
     try {
-      const s = bridge().getState();
-      night = !isDaylight(s.site, s.day);
+      night = !isDaylight(bridge().getState().site, bridge().getState().day);
     } catch {
       /* */
     }
-
     let seed = 42;
     try {
-      seed = bridge().getDay() * 7919 + (bridge().getState().site === "rim" ? 3 : 5);
+      seed = bridge().getDay() * 7919 + 3;
     } catch {
       /* */
     }
     paintMoonGround(this, W, H, night, createRng(seed));
-
     this.add
-      .image(W / 2, H * 0.55, "surface")
-      .setDisplaySize(W * 0.92, H * 0.55)
-      .setAlpha(0.22)
+      .image(W / 2, H * 0.58, "surface")
+      .setDisplaySize(W * 0.85, H * 0.42)
+      .setAlpha(0.2)
       .setDepth(1);
 
     if (!night) {
-      this.add.ellipse(W * 0.85, H * 0.1, 90, 90, 0xffe08a, 0.55).setDepth(2);
+      this.add.ellipse(W * 0.88, H * 0.1, 70, 70, 0xffe08a, 0.5).setDepth(2);
     } else {
       const rng = createRng(seed);
       const stars: Phaser.GameObjects.Arc[] = [];
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 12; i++) {
         stars.push(
-          this.add.circle(rng() * W, rng() * H * 0.35, 1.2, 0xffffff, 0.8).setDepth(2),
+          this.add.circle(rng() * W, rng() * H * 0.3, 1.2, 0xffffff, 0.85).setDepth(2),
         );
       }
       twinkleStars(this, stars);
     }
-    this.add.image(W * 0.08, H * 0.1, "earth").setDisplaySize(64, 64).setDepth(3);
+    this.add.image(W * 0.08, H * 0.09, "earth").setDisplaySize(52, 52).setDepth(3);
 
-    this.placeDoor("home", "Crew home", W * 0.18, H * 0.4, "habitat", 110, 95);
-    this.placeDoor("greenhouse", "Greenhouse", W * 0.48, H * 0.36, "greenhouse", 100, 95);
-    this.placeDoor("lab", "Science lab", W * 0.78, H * 0.4, "labCottage", 100, 95);
+    this.addBuilding("home", "Crew home", W * 0.22, H * 0.42, "habitat", 96, 82);
+    this.addBuilding("greenhouse", "Greenhouse", W * 0.5, H * 0.38, "greenhouse", 90, 82);
+    this.addBuilding("lab", "Science lab", W * 0.78, H * 0.42, "labCottage", 90, 82);
 
-    this.panelsImg = this.add
-      .image(W * 0.32, H * 0.68, "panels")
-      .setDisplaySize(90, 54)
-      .setDepth(7);
-    this.dishImg = this.add
-      .image(W * 0.62, H * 0.66, "dish")
-      .setDisplaySize(64, 64)
-      .setDepth(7);
-    this.add.image(W * 0.88, H * 0.7, "rover").setDisplaySize(80, 52).setDepth(7);
+    this.panelsImg = this.add.image(W * 0.34, H * 0.68, "panels").setDisplaySize(72, 44).setDepth(7);
+    this.dishImg = this.add.image(W * 0.58, H * 0.66, "dish").setDisplaySize(52, 52).setDepth(7);
+    this.add.image(W * 0.86, H * 0.68, "rover").setDisplaySize(64, 42).setDepth(7);
+    if (this.panelsImg) panelGlow(this, this.panelsImg, true);
+
+    this.shieldRing = this.add
+      .circle(W * 0.22, H * 0.42, 58, 0x7ec8ff, 0.08)
+      .setStrokeStyle(2, 0xa8e6ff, 0.35)
+      .setDepth(5);
 
     this.buildTanks(W, H);
     this.buildPlants(W, H);
-    this.buildHud(W, H);
-    this.buildOutdoorCircles(W, H);
+    this.buildOutdoorJobs(W, H);
+    this.buildMaterialCrates(W, H);
 
+    const spawn = this.spawnPoint(W, H);
     this.player = this.physics.add
-      .sprite(W * 0.5, H * 0.72, "nova")
-      .setDisplaySize(56, 76)
+      .sprite(spawn.x, spawn.y, "nova")
+      .setDisplaySize(48, 64)
       .setCollideWorldBounds(true)
       .setDepth(20);
-    this.player.body!.setSize(28, 22);
-    this.player.body!.setOffset(16, 52);
-    this.physics.world.setBounds(20, H * 0.34, W - 40, H * 0.54);
+    this.player.body!.setSize(24, 18);
+    this.player.body!.setOffset(14, 44);
+    this.physics.world.setBounds(16, H * 0.36, W - 32, H * 0.5);
 
-    const sh = addShadow(this, this.player);
+    const sh = addShadow(this, this.player, 40);
     this.shadowSync = sh.sync;
     idleBreathe(this, this.player);
     this.walkSync = walkHop(this.player, (x, y) => {
@@ -161,40 +200,103 @@ export class BaseWorldScene extends Phaser.Scene {
 
     this.keys = makeKeys(this);
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (this.ending || !bridge().ready()) return;
+      if (this.ending || this.crewTalk?.isOpen() || this.drag.dragging) return;
       this.walkTarget = {
         x: p.worldX,
-        y: Phaser.Math.Clamp(p.worldY, H * 0.38, H * 0.88),
+        y: Phaser.Math.Clamp(p.worldY, H * 0.4, H * 0.86),
       };
     });
 
-    this.time.delayedCall(100, () => this.beginDay());
-  }
-
-  private beginDay() {
-    if (!bridge().ready()) return;
-    this.ending = false;
-    this.lastDay = bridge().getDay();
-    if (this.lastDay === 1) audio.play("dayStart");
-    try {
-      const shields = bridge().getState().shieldLevel;
-      if (shields > 0) {
-        shieldShimmer(this, this.scale.width * 0.18, this.scale.height * 0.4, shields);
-      }
-    } catch {
-      /* */
+    this.chipTray = new ChipTray(this);
+    this.chipTray.setDrag(this.drag);
+    if (bridge().ready()) resetTutorialForDay(bridge().getDay());
+    // Day-1 tutorial replaces first-visit chatter.
+    this.crewTalk = isTutorialActive()
+      ? ({ isOpen: () => false } as CrewTalk)
+      : new CrewTalk(this, "surface");
+    this.coach = new GuideCoach(this);
+    this.morning = new MorningTalk(this);
+    if (bridge().ready() && bridge().getEvent()?.stormSeverity !== undefined) {
+      audio.play("stormRumble");
+      this.stormHud = new StormCrewHud(
+        this,
+        this.drag,
+        getCrewShelter(),
+        (s: CrewShelterMap) => {
+          setCrewShelter(s);
+          bridge().patchDecisions({ shelteredCrewCount: countSheltered(s) });
+          bridge().setSheltering(countSheltered(s) >= 3);
+        },
+      );
     }
-    this.refreshWorldFx(true);
-    this.refreshAlerts();
-    this.refreshHud(true);
-    for (const c of this.circles) c.refresh();
-    this.novaBubble.setText(
-      bridge().getNovaLine() ||
-        "Walk into a building. Stand on circles to switch machines. Bed ends the day.",
+    new PlaceHud(
+      this,
+      [
+        { id: "surface", label: "Surface", go: () => (this.walkTarget = { x: W * 0.5, y: H * 0.72 }) },
+        { id: "home", label: "Home", go: () => this.goPlace("home") },
+        { id: "greenhouse", label: "Plants", go: () => this.goPlace("greenhouse") },
+        { id: "lab", label: "Lab", go: () => this.goPlace("lab") },
+      ],
+      "surface",
     );
+
+    this.alertText = this.add
+      .text(W / 2, 78, "", {
+        fontFamily: THEME.fontDisplay,
+        fontSize: "12px",
+        color: "#fff8ef",
+        backgroundColor: "#c98b7b",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(82)
+      .setScrollFactor(0)
+      .setVisible(false);
+
+    this.novaBubble = this.add
+      .text(W / 2, H - 10, "", {
+        fontFamily: THEME.font,
+        fontSize: "12px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 8, y: 5 },
+        align: "center",
+        wordWrap: { width: W - 36 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(82)
+      .setScrollFactor(0);
+
+    this.time.delayedCall(80, () => {
+      if (!bridge().ready()) return;
+      this.lastDay = bridge().getDay();
+      if (this.lastDay === 1) audio.play("dayStart");
+      this.refreshAlerts();
+      this.refreshWorldFx(true);
+      this.chipTray.refresh(true);
+      const line = bridge().getNovaLine();
+      if (line) this.novaBubble.setText(line);
+      this.syncShieldVisual(true);
+    });
   }
 
-  private placeDoor(
+  private spawnPoint(W: number, H: number) {
+    if (this.spawnNear === "home") return { x: W * 0.22, y: H * 0.62 };
+    if (this.spawnNear === "greenhouse") return { x: W * 0.5, y: H * 0.58 };
+    if (this.spawnNear === "lab") return { x: W * 0.78, y: H * 0.62 };
+    return { x: W * 0.5, y: H * 0.72 };
+  }
+
+  private goPlace(room: "home" | "greenhouse" | "lab") {
+    const d = this.doors.find((x) => x.room === room);
+    if (!d) {
+      this.enterRoom(room);
+      return;
+    }
+    this.walkTarget = { x: d.x, y: d.y };
+  }
+
+  private addBuilding(
     room: "home" | "greenhouse" | "lab",
     label: string,
     x: number,
@@ -205,291 +307,310 @@ export class BaseWorldScene extends Phaser.Scene {
   ) {
     this.add.image(x, y, key).setDisplaySize(w, h).setDepth(6);
     this.add
-      .text(x, y - h * 0.55, label, {
+      .text(x, y - h * 0.52, label, {
         fontFamily: THEME.fontDisplay,
-        fontSize: "12px",
+        fontSize: "11px",
         color: THEME.ink,
         backgroundColor: THEME.cream,
-        padding: { x: 6, y: 2 },
+        padding: { x: 5, y: 2 },
       })
       .setOrigin(0.5)
       .setDepth(25);
+    const doorY = y + h * 0.38;
+    this.add
+      .rectangle(x, doorY, 36, 22, 0x5a4030, 0.95)
+      .setStrokeStyle(2, 0xffe08a, 0.8)
+      .setDepth(9);
+    this.add
+      .text(x, doorY, "DOOR", {
+        fontFamily: THEME.font,
+        fontSize: "9px",
+        color: THEME.cream,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+    this.doors.push({ room, x, y: doorY, r: 28 });
+    if (room === "home") this.homeDoorPos = { x, y: doorY };
+  }
 
-    const c = new DwellCircle(this, {
-      id: `door-${room}`,
-      x,
-      y: y + h * 0.35,
-      label: `Enter ${label}`,
-      costBenefit: "Stand still to go inside",
-      radius: 32,
-      getOn: () => false,
-      onComplete: () => {
-        audio.play("door");
-        sparkBurst(this, x, y);
-        this.scene.start("indoor", { room });
-      },
+  private enterRoom(room: "home" | "greenhouse" | "lab") {
+    if (this.doorCooldown > 0 || this.ending) return;
+    if (isTutorialActive()) {
+      const idx = getTutorial().index;
+      // Block leaving surface before radio chip.
+      if (idx === 0) {
+        this.say("First, chip the radio — follow the arrow.");
+        return;
+      }
+      if (room === "home" && idx === 1) advanceTutorial("enter_home");
+      if (room === "home" && idx === 5) advanceTutorial("back_home");
+    }
+    this.doorCooldown = 500;
+    audio.play("door");
+    sparkBurst(this, this.player.x, this.player.y - 10);
+    this.cameras.main.fadeOut(120, 42, 34, 28);
+    this.time.delayedCall(130, () => {
+      this.scene.start("indoor", { room });
     });
-    this.circles.push(c);
   }
 
   private buildTanks(W: number, H: number) {
     const mk = (x: number, label: string, color: number) => {
-      this.add
-        .rectangle(x, H * 0.52, 26, 64, 0x2a2218, 0.9)
-        .setStrokeStyle(2, THEME.line, 0.3)
-        .setDepth(8);
-      const fill = this.add
-        .rectangle(x, H * 0.52 + 28, 20, 56, color, 0.9)
-        .setOrigin(0.5, 1)
-        .setDepth(9);
-      this.add
-        .text(x, H * 0.52 - 40, label, {
-          fontFamily: THEME.font,
-          fontSize: "10px",
-          color: THEME.cream,
-        })
-        .setOrigin(0.5)
-        .setDepth(10);
+      this.add.rectangle(x, H * 0.55, 22, 54, 0x2a2218, 0.9).setStrokeStyle(2, THEME.line, 0.3).setDepth(8);
+      const fill = this.add.rectangle(x, H * 0.55 + 24, 16, 48, color, 0.9).setOrigin(0.5, 1).setDepth(9);
+      this.add.text(x, H * 0.55 - 34, label, { fontFamily: THEME.font, fontSize: "9px", color: THEME.cream }).setOrigin(0.5).setDepth(10);
       return fill;
     };
     this.waterFill = mk(W * 0.06, "H₂O", 0x3a7ca5);
-    this.oxyFill = mk(W * 0.11, "O₂", 0x2f7d4a);
+    this.oxyFill = mk(W * 0.1, "O₂", 0x2f7d4a);
   }
 
   private buildPlants(W: number, H: number) {
     this.plantLeaves = [];
     for (let i = 0; i < 3; i++) {
-      const x = W * (0.42 + i * 0.05);
-      const y = H * 0.48;
-      const leaf = this.add.ellipse(x, y, 28, 36, 0x8a6a3a).setDepth(8);
-      this.add.rectangle(x, y + 22, 22, 12, 0x6b4a2a).setDepth(8);
+      const x = W * (0.44 + i * 0.04);
+      const y = H * 0.5;
+      const leaf = this.add.ellipse(x, y, 22, 28, 0x8a6a3a).setDepth(8);
+      this.add.rectangle(x, y + 16, 16, 10, 0x6b4a2a).setDepth(8);
       this.plantLeaves.push(leaf);
     }
   }
 
-  private buildHud(W: number, H: number) {
-    this.powerHud = this.add.container(12, 10).setDepth(70).setScrollFactor(0);
-    this.powerTitle = this.add.text(0, 0, "Day 1/10 · Power", {
-      fontFamily: THEME.fontDisplay,
-      fontSize: "13px",
-      color: THEME.ink,
-      backgroundColor: THEME.cream,
-      padding: { x: 8, y: 4 },
-    });
-    this.powerHud.add(this.powerTitle);
-    // Cap cells once; tint later (never destroy each frame).
-    for (let i = 0; i < 20; i++) {
-      const cell = this.add
-        .rectangle(8 + i * 18, 28, 14, 22, 0x6a6570, 0.35)
-        .setStrokeStyle(1, THEME.line, 0.35)
-        .setVisible(false);
-      this.powerHud.add(cell);
-      this.powerCells.push(cell);
-    }
-
-    this.resourceHud = this.add
-      .text(12, 48, "", {
-        fontFamily: THEME.font,
-        fontSize: "12px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 8, y: 5 },
-      })
-      .setDepth(70)
-      .setScrollFactor(0);
-
-    this.alertText = this.add
-      .text(W / 2, 10, "", {
-        fontFamily: THEME.fontDisplay,
-        fontSize: "13px",
-        color: "#fff8ef",
-        backgroundColor: "#c98b7b",
-        padding: { x: 10, y: 5 },
-        align: "center",
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(71)
-      .setScrollFactor(0)
-      .setVisible(false);
-
-    this.novaBubble = this.add
-      .text(W / 2, H - 14, "", {
-        fontFamily: THEME.font,
-        fontSize: "13px",
-        color: THEME.ink,
-        backgroundColor: THEME.cream,
-        padding: { x: 10, y: 6 },
-        align: "center",
-        wordWrap: { width: W - 40 },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(72)
-      .setScrollFactor(0);
-
-    this.add
-      .text(W - 12, H - 8, "NASA stills · DONKI · OSDR — see About the data", {
-        fontFamily: THEME.font,
-        fontSize: "9px",
-        color: THEME.inkSoft,
-      })
-      .setOrigin(1, 1)
-      .setDepth(70)
-      .setScrollFactor(0)
-      .setAlpha(0.75);
-  }
-
-  private buildOutdoorCircles(W: number, H: number) {
-    const add = (
-      id: string,
-      x: number,
-      y: number,
-      label: string,
-      costBenefit: string,
-      getOn: () => boolean,
-      onComplete: (wasOn: boolean) => void,
-      isAvailable?: () => boolean,
-    ) => {
-      this.circles.push(
-        new DwellCircle(this, {
-          id,
-          x,
-          y,
-          label,
-          costBenefit,
-          getOn,
-          onComplete,
-          isAvailable,
-        }),
+  private buildMaterialCrates(W: number, H: number) {
+    for (let i = 0; i < 3; i++) {
+      const c = this.add.container(W * 0.12 + i * 28, H * 0.78).setDepth(16);
+      const box = this.add.rectangle(0, 0, 22, 18, 0xb08968, 0.95).setStrokeStyle(2, THEME.line, 0.4);
+      const t = this.add.text(0, 0, "📦", { fontSize: "12px" }).setOrigin(0.5);
+      c.add([box, t]);
+      c.setSize(24, 20);
+      c.setInteractive(
+        new Phaser.Geom.Rectangle(-12, -10, 24, 20),
+        Phaser.Geom.Rectangle.Contains,
       );
-    };
-
-    add(
-      "science",
-      W * 0.78,
-      H * 0.72,
-      "Science walk",
-      `−${SCIENCE_COST_PER_LEVEL} power · +science +risk`,
-      () => bridge().getDecisions().scienceLevel > 0,
-      (wasOn) => {
-        if (!this.canAfford(!wasOn, { scienceLevel: wasOn ? 0 : 1 })) return;
-        bridge().patchDecisions({
-          scienceLevel: wasOn ? 0 : Math.min(SCIENCE_LEVEL_MAX, 1),
-        });
-        audio.play(wasOn ? "toggleOff" : "toggleOn");
-        if (!wasOn) floatNumber(this, W * 0.78, H * 0.65, "+science", THEME.sageInk);
-        sparkBurst(this, W * 0.78, H * 0.68);
-        this.afterToggle();
-      },
-    );
-
-    add(
-      "shield",
-      W * 0.28,
-      H * 0.78,
-      "Build shield",
-      "−2 materials · less storm risk",
-      () => Boolean(bridge().getDecisions().buildShield),
-      (wasOn) => {
-        if (!wasOn && bridge().getState().materials < 2) {
-          bridge().setNovaLine("Need 2 materials to build a shield.");
-          this.novaBubble.setText(bridge().getNovaLine());
+      c.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        if (!bridge().ready() || this.drag.dragging) return;
+        if (bridge().getState().materials < SHIELD_MATERIAL_COST) {
+          this.say("Need more materials.");
           return;
         }
-        bridge().patchDecisions({ buildShield: !wasOn });
-        audio.play(wasOn ? "toggleOff" : "toggleOn");
-        if (!wasOn) shieldShimmer(this, W * 0.18, H * 0.4, 1);
-        this.afterToggle();
-      },
-    );
-
-    add(
-      "shelter",
-      W * 0.18,
-      H * 0.72,
-      "Shelter",
-      "0 power · cuts storm risk · no outdoor science",
-      () => bridge().getSheltering(),
-      (wasOn) => {
-        bridge().setSheltering(!wasOn);
-        audio.play(wasOn ? "toggleOff" : "shelterClose");
-        bridge().setNovaLine(
-          wasOn
-            ? "Shelter off — we will stay out if a storm hits."
-            : "Shelter ready. Go inside and use the bed when done.",
-        );
-        this.novaBubble.setText(bridge().getNovaLine());
-        this.afterToggle();
-      },
-      () => bridge().getEvent()?.stormSeverity !== undefined,
-    );
-
-    // Quick outdoor radio (also available inside home).
-    add(
-      "radio",
-      W * 0.62,
-      H * 0.78,
-      "Radio",
-      `−${COMMS_COST} power · storm warning next day`,
-      () => bridge().getDecisions().comms,
-      (wasOn) => this.toggleBool("comms", wasOn, "powerHum"),
-    );
-  }
-
-  private toggleBool(
-    key: "recycler" | "oxygenMaker" | "comms" | "greenhouse" | "cleanFilter",
-    wasOn: boolean,
-    sfx?: "waterTrickle" | "airHiss" | "powerHum" | "plantSparkle",
-  ) {
-    if (!this.canAfford(!wasOn, { [key]: !wasOn })) return;
-    bridge().patchDecisions({ [key]: !wasOn });
-    audio.play(wasOn ? "toggleOff" : "toggleOn");
-    if (!wasOn && sfx) audio.play(sfx);
-    sparkBurst(this, this.player.x, this.player.y - 24);
-    this.afterToggle();
-  }
-
-  private canAfford(turningOn: boolean, patch: Record<string, unknown>): boolean {
-    if (!turningOn) return true;
-    const d = { ...bridge().getDecisions(), ...patch };
-    if (plannedPowerCost(d as never) > bridge().getPowerToday()) {
-      bridge().setNovaLine("Not enough power cells left for that.");
-      this.novaBubble.setText(bridge().getNovaLine());
-      audio.play("uiClick");
-      return false;
+        if (bridge().getDecisions().buildShield) {
+          this.say("Shield layer already queued today.");
+          return;
+        }
+        p.event.stopPropagation();
+        this.drag.begin({ kind: "material", amount: SHIELD_MATERIAL_COST }, p.worldX, p.worldY, 0xb08968);
+      });
+      this.crateRoots.push(c);
     }
+  }
+
+  private buildOutdoorJobs(W: number, H: number) {
+    const sciPts =
+      bridge().ready() && bridge().getState().site === "plain"
+        ? SCIENCE_POINTS_PLAIN
+        : SCIENCE_POINTS_RIM;
+
+    this.radioPos = { x: W * 0.58, y: H * 0.78 };
+    this.addStation(
+      new JobStation(this, {
+        id: "radio",
+        x: W * 0.58,
+        y: H * 0.78,
+        label: "Radio dish",
+        costs: [{ icon: "⚡", value: -COMMS_COST }],
+        benefits: [{ icon: "📡", value: "warn" }],
+        accept: "chip",
+        chipCost: COMMS_COST,
+        getOn: () => bridge().getDecisions().comms,
+        getFill: () => this.fills.radio ?? 0,
+        onDrop: (p) =>
+          this.dropChips("radio", COMMS_COST, p.amount, (on) => {
+            bridge().patchDecisions({ comms: on });
+            if (on) {
+              audio.play("powerHum");
+              floatNumber(this, W * 0.58, H * 0.7, "Radio ON", THEME.sageInk);
+              advanceTutorial("radio_chip");
+            }
+            this.refreshWorldFx(false);
+          }),
+      }),
+    );
+
+    this.addStation(
+      new JobStation(this, {
+        id: "science",
+        x: W * 0.72,
+        y: H * 0.78,
+        label: "Science walk",
+        costs: [
+          { icon: "⚡", value: -SCIENCE_COST_PER_LEVEL },
+          { icon: "⚠", value: "+risk" },
+        ],
+        benefits: [{ icon: "🔬", value: `+${sciPts}` }],
+        accept: "chip",
+        chipCost: 1,
+        getOn: () => bridge().getDecisions().scienceLevel > 0,
+        onDrop: () => {
+          const d = bridge().getDecisions();
+          const next = Math.min(SCIENCE_LEVEL_MAX, d.scienceLevel + 1);
+          if (next === d.scienceLevel) {
+            this.say("Max science walks today.");
+            return false;
+          }
+          if (plannedPowerCost({ ...d, scienceLevel: next }) > bridge().getPowerToday()) {
+            this.say("Not enough power chips.");
+            return false;
+          }
+          bridge().patchDecisions({ scienceLevel: next });
+          floatNumber(this, W * 0.72, H * 0.7, `+1 walk · risk`, THEME.rose);
+          const storm = bridge().getEvent()?.stormSeverity !== undefined;
+          if (storm) floatNumber(this, W * 0.72, H * 0.64, "storm exposure!", THEME.rose);
+          this.afterJob();
+          return true;
+        },
+      }),
+    );
+
+    this.addStation(
+      new JobStation(this, {
+        id: "shield",
+        x: W * 0.28,
+        y: H * 0.62,
+        label: "Shield frame",
+        costs: [{ icon: "📦", value: -SHIELD_MATERIAL_COST }],
+        benefits: [{ icon: "🛡", value: "−risk" }],
+        accept: "material",
+        radius: 40,
+        getOn: () => Boolean(bridge().getDecisions().buildShield),
+        onDrop: () => {
+          if (bridge().getDecisions().buildShield) {
+            this.say("Already building a shield layer today.");
+            return false;
+          }
+          if (bridge().getState().materials < SHIELD_MATERIAL_COST) {
+            this.say("Need 2 materials.");
+            return false;
+          }
+          bridge().patchDecisions({ buildShield: true });
+          shieldShimmer(this, W * 0.22, H * 0.42, (bridge().getState().shieldLevel || 0) + 1);
+          floatNumber(this, W * 0.28, H * 0.55, "Shield +1 tonight", THEME.sageInk);
+          this.syncShieldVisual(true);
+          this.afterJob();
+          return true;
+        },
+      }),
+    );
+
+    // Drop crew portraits (or Nova) onto Crew home door to shelter.
+    this.addStation(
+      new JobStation(this, {
+        id: "crew_home_shelter",
+        x: W * 0.22,
+        y: H * 0.62,
+        label: "Shelter drop",
+        costs: [{ icon: "👨‍🚀", value: 0 }],
+        benefits: [{ icon: "🛡", value: "safer" }],
+        accept: "nova",
+        radius: 44,
+        getOn: () => countSheltered(getCrewShelter()) >= 3,
+        onDrop: (p) => {
+          if (bridge().getEvent()?.stormSeverity === undefined) {
+            this.say("No storm today — no need to shelter.");
+            return false;
+          }
+          const ok = this.stormHud?.tryReceive(p.sourceId) ?? false;
+          if (!ok && p.sourceId) {
+            // Nova herself counts as "all in" toggle for solo play.
+            bridge().setSheltering(true);
+            bridge().patchDecisions({ shelteredCrewCount: 3 });
+            this.say("Nova ducks into Crew home.");
+            this.afterJob();
+            return true;
+          }
+          if (ok) {
+            audio.play("shelterClose");
+            floatNumber(this, W * 0.22, H * 0.55, "Safe inside!", THEME.sageInk);
+            this.afterJob();
+          }
+          return ok;
+        },
+        isAvailable: () => bridge().getEvent()?.stormSeverity !== undefined,
+      }),
+    );
+  }
+
+  private addStation(station: JobStation) {
+    this.stations.push(station);
+    this.drag.register(station);
+  }
+
+  private dropChips(
+    id: string,
+    need: number,
+    amount: number,
+    apply: (on: boolean) => void,
+  ): boolean {
+    const d = bridge().getDecisions();
+    if (id === "radio" && d.comms) {
+      apply(false);
+      this.fills[id] = 0;
+      this.afterJob();
+      return true;
+    }
+    const have = Math.min(need, (this.fills[id] ?? 0) + amount);
+    if (have >= need) {
+      if (
+        id === "radio" &&
+        plannedPowerCost({ ...d, comms: true }) > bridge().getPowerToday()
+      ) {
+        this.say("Not enough power chips.");
+        return false;
+      }
+      this.fills[id] = 0;
+      apply(true);
+      this.afterJob();
+      return true;
+    }
+    this.fills[id] = have;
+    this.afterJob();
     return true;
   }
 
-  private afterToggle() {
-    this.refreshHud(true);
-    this.refreshWorldFx(false);
-    for (const c of this.circles) c.refresh();
+  private heldTotal(): number {
+    let n = 0;
+    for (const v of Object.values(this.fills)) n += v;
+    return n;
   }
 
-  private refreshHud(force = false) {
-    if (!bridge().ready()) return;
-    const power = bridge().getPowerToday();
-    const spent = plannedPowerCost(bridge().getDecisions());
-    const left = Math.max(0, power - spent);
-    const s = bridge().getState();
-    const key = `${s.day}|${power}|${left}|${s.water}|${s.oxygen}|${s.science}|${s.exposure.toFixed(0)}|${s.materials}`;
-    if (!force && key === this.lastHudKey) return;
-    this.lastHudKey = key;
+  private afterJob() {
+    this.chipTray.setHeldExtra(this.heldTotal());
+    this.chipTray.refresh(true);
+    for (const s of this.stations) s.refresh();
+  }
 
-    this.powerTitle.setText(`Day ${s.day}/10 · Power`);
-    for (let i = 0; i < this.powerCells.length; i++) {
-      const cell = this.powerCells[i]!;
-      if (i >= power) {
-        cell.setVisible(false);
-        continue;
+  private say(msg: string) {
+    bridge().setNovaLine(msg);
+    this.novaBubble.setText(msg);
+  }
+
+  private syncShieldVisual(force: boolean) {
+    if (!bridge().ready()) return;
+    const lv = bridge().getState().shieldLevel + (bridge().getDecisions().buildShield ? 1 : 0);
+    if (!force && lv === this.lastShield) return;
+    this.lastShield = lv;
+    if (this.shieldRing) {
+      this.shieldRing.setRadius(50 + lv * 10);
+      this.shieldRing.setAlpha(lv > 0 ? 0.18 : 0.06);
+      if (lv > 0 && !reduceMotion()) {
+        this.tweens.add({
+          targets: this.shieldRing,
+          alpha: { from: 0.12, to: 0.28 },
+          duration: 900,
+          yoyo: true,
+          repeat: 2,
+        });
       }
-      cell.setVisible(true);
-      const filled = i < left;
-      cell.setFillStyle(filled ? 0xffe08a : 0x6a6570, filled ? 0.95 : 0.35);
     }
-    this.resourceHud.setText(
-      `💧${s.water}  O₂${s.oxygen}  Science goal: ${s.science} / ${SCIENCE_SUCCESS_TARGET}  ⚠${s.exposure.toFixed(0)}  mats ${s.materials}`,
-    );
   }
 
   private refreshAlerts() {
@@ -513,7 +634,6 @@ export class BaseWorldScene extends Phaser.Scene {
     if (!bridge().ready()) return;
     const d = bridge().getDecisions();
     const st = bridge().getState();
-
     const commsOn = Boolean(d.comms);
     if (force || commsOn !== this.lastComms) {
       this.lastComms = commsOn;
@@ -531,41 +651,34 @@ export class BaseWorldScene extends Phaser.Scene {
         this.dishImg?.setAngle(0);
       }
     }
-
-    if (this.panelsImg && !this.panelTween) {
-      this.panelTween = panelGlow(this, this.panelsImg, true);
-    }
-
-    const water01 =
-      (st.water - LOSE_WATER_AT) / Math.max(1, START_WATER - LOSE_WATER_AT);
-    const oxy01 =
-      (st.oxygen - LOSE_OXYGEN_AT) / Math.max(1, START_OXYGEN - LOSE_OXYGEN_AT);
-    if (this.waterFill) {
-      this.waterFill.setDisplaySize(20, Math.max(4, 56 * Phaser.Math.Clamp(water01, 0, 1)));
-    }
-    if (this.oxyFill) {
-      this.oxyFill.setDisplaySize(20, Math.max(4, 56 * Phaser.Math.Clamp(oxy01, 0, 1)));
-    }
-
+    const water01 = (st.water - LOSE_WATER_AT) / Math.max(1, START_WATER - LOSE_WATER_AT);
+    const oxy01 = (st.oxygen - LOSE_OXYGEN_AT) / Math.max(1, START_OXYGEN - LOSE_OXYGEN_AT);
+    this.waterFill?.setDisplaySize(16, Math.max(4, 48 * Phaser.Math.Clamp(water01, 0, 1)));
+    this.oxyFill?.setDisplaySize(16, Math.max(4, 48 * Phaser.Math.Clamp(oxy01, 0, 1)));
     const oxyOn = Boolean(d.oxygenMaker);
     if (force || oxyOn !== this.lastOxyOn) {
       this.lastOxyOn = oxyOn;
       this.bubbleTimer?.remove(false);
       this.bubbleTimer = null;
       if (oxyOn && this.oxyFill) {
-        this.bubbleTimer = oxygenBubbles(this, this.oxyFill.x, this.oxyFill.y - 36, true);
+        this.bubbleTimer = oxygenBubbles(this, this.oxyFill.x, this.oxyFill.y - 30, true);
       }
     }
-
     const plantsOn = Boolean(d.greenhouse);
     if (force || plantsOn !== this.lastGreenhouse) {
       this.lastGreenhouse = plantsOn;
-      for (const leaf of this.plantLeaves) setPlantHealth(leaf, plantsOn);
+      for (const leaf of this.plantLeaves) setPlantStage(leaf, plantsOn ? 3 : 0);
     }
+    const mats = st.materials;
+    for (let i = 0; i < this.crateRoots.length; i++) {
+      this.crateRoots[i]!.setAlpha(mats >= SHIELD_MATERIAL_COST ? 1 : 0.35);
+    }
+    this.syncShieldVisual(false);
   }
 
   update(_t: number, dt: number) {
     if (!this.player?.body || !bridge().ready()) return;
+    if (this.doorCooldown > 0) this.doorCooldown -= dt;
 
     const day = bridge().getDay();
     if (this.lastDay > 0 && day !== this.lastDay && !this.ending) {
@@ -573,9 +686,37 @@ export class BaseWorldScene extends Phaser.Scene {
       return;
     }
 
-    if (this.ending) {
+    if (
+      this.ending ||
+      this.crewTalk?.isOpen() ||
+      this.morning?.isOpen() ||
+      this.drag.dragging
+    ) {
       this.player.setVelocity(0, 0);
+      if (this.drag.dragging) {
+        this.shadowSync?.();
+        return;
+      }
       return;
+    }
+
+    this.coach?.sync(
+      getTutorial(),
+      {
+        radio: this.radioPos,
+        home_door: this.homeDoorPos,
+      },
+      "surface",
+    );
+
+    // Nova drag for shelter
+    if (!this.player.input) {
+      this.player.setInteractive({ useHandCursor: true });
+      this.player.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        if (bridge().getEvent()?.stormSeverity === undefined) return;
+        p.event.stopPropagation();
+        this.drag.begin({ kind: "nova", amount: 1 }, p.worldX, p.worldY);
+      });
     }
 
     let pad = { x: 0, y: 0 };
@@ -583,7 +724,7 @@ export class BaseWorldScene extends Phaser.Scene {
       const dx = this.walkTarget.x - this.player.x;
       const dy = this.walkTarget.y - this.player.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < 12) this.walkTarget = null;
+      if (dist < 10) this.walkTarget = null;
       else pad = { x: dx / dist, y: dy / dist };
     }
     if (this.keys) {
@@ -606,13 +747,17 @@ export class BaseWorldScene extends Phaser.Scene {
     this.shadowSync?.();
     this.walkSync?.();
 
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const still = Math.hypot(body.velocity.x, body.velocity.y) < STILL_SPEED;
-    for (const c of this.circles) {
-      c.update(c.contains(this.player.x, this.player.y) && still, dt);
+    if (this.doorCooldown <= 0) {
+      for (const d of this.doors) {
+        if (Phaser.Math.Distance.Between(this.player.x, this.player.y, d.x, d.y) < d.r) {
+          this.enterRoom(d.room);
+          break;
+        }
+      }
     }
 
-    this.refreshHud(false);
+    this.chipTray.setHeldExtra(this.heldTotal());
+    this.chipTray.refresh(false);
     this.refreshWorldFx(false);
     const line = bridge().getNovaLine();
     if (line && this.novaBubble.text !== line) this.novaBubble.setText(line);

@@ -251,14 +251,30 @@ export function setPlantHealth(
   healthy: boolean,
   _scene?: Phaser.Scene,
 ) {
-  if (healthy) {
+  setPlantStage(leaf, healthy ? 3 : 0);
+}
+
+/**
+ * Plant growth stages: 0 wilt · 1 watered sprout · 2 lit grow · 3 lush.
+ */
+export function setPlantStage(leaf: Phaser.GameObjects.Ellipse, stage: number) {
+  const s = Phaser.Math.Clamp(Math.floor(stage), 0, 3);
+  if (s === 0) {
+    leaf.setFillStyle(0x8a6a3a);
+    leaf.setScale(1, 0.55);
+    leaf.setAngle(-16);
+  } else if (s === 1) {
+    leaf.setFillStyle(0x6a9a4a);
+    leaf.setScale(0.85, 0.75);
+    leaf.setAngle(-4);
+  } else if (s === 2) {
     leaf.setFillStyle(0x3a9a4a);
-    leaf.setScale(1, 1);
+    leaf.setScale(1, 0.95);
     leaf.setAngle(0);
   } else {
-    leaf.setFillStyle(0x8a6a3a);
-    leaf.setScale(1, 0.65);
-    leaf.setAngle(-14);
+    leaf.setFillStyle(0x2f8a3a);
+    leaf.setScale(1.1, 1.15);
+    leaf.setAngle(0);
   }
 }
 

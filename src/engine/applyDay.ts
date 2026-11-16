@@ -109,7 +109,7 @@ function applyPendingDue(
 
 /**
  * Resolve one mission day. Pure: no UI, no network.
- * Heat is forced. Unspent power returns to the battery (cap 20).
+ * Heat is forced. Unspent power returns to the battery (cap BATTERY_CAP).
  */
 export function applyDay(
   state: GameState,
@@ -122,7 +122,10 @@ export function applyDay(
   const scienceLevel = clampScienceLevel(decisions.scienceLevel);
   const greenhouse = Boolean(decisions.greenhouse);
   const option = choice === "A" ? event.optionA : event.optionB;
-  const sheltered = Boolean(option.effects.sheltered);
+  const sheltered =
+    decisions.shelteredCrewCount !== undefined
+      ? decisions.shelteredCrewCount >= 3
+      : Boolean(option.effects.sheltered);
 
   // Delayed costs from earlier choices land at the start of this day.
   let working = applyPendingDue(
@@ -320,13 +323,26 @@ export function applyDay(
 
   const severity = event.stormSeverity;
   if (severity !== undefined) {
-    const delta = stormExposureDelta(severity, shieldLevel, sheltered);
+    const crewCount = decisions.shelteredCrewCount;
+    let delta: number;
+    if (crewCount !== undefined) {
+      const c = Math.max(0, Math.min(3, Math.floor(crewCount)));
+      const ratio = c / 3;
+      const inD = stormExposureDelta(severity, shieldLevel, true);
+      const outD = stormExposureDelta(severity, shieldLevel, false);
+      delta = inD * ratio + outD * (1 - ratio);
+      notes.push(
+        `Crew risk +${delta.toFixed(1)}: storm hit — ${c}/3 crew in shelter (shields help).`,
+      );
+    } else {
+      delta = stormExposureDelta(severity, shieldLevel, sheltered);
+      notes.push(
+        sheltered
+          ? `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was in shelter.`
+          : `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was outside.`,
+      );
+    }
     exposure += delta;
-    notes.push(
-      sheltered
-        ? `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was in shelter.`
-        : `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was outside.`,
-    );
   } else if (scienceLevelsRun > 0 && !sheltered) {
     const delta = normalOutsideExposure();
     exposure += delta;

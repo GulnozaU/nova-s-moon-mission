@@ -198,7 +198,7 @@ describe("engine Section 3", () => {
     );
   });
 
-  it("4) battery never exceeds 20", () => {
+  it("4) battery never exceeds carry-over cap", () => {
     let state = createGame("rim", 1).state;
     // Spend almost nothing beyond forced heat → large surplus each day
     for (let i = 0; i < 10; i++) {

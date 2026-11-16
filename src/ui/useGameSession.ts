@@ -19,6 +19,7 @@ import {
 } from "../content/schedule";
 import type { Event, GameState, SiteId, SourceBadge } from "../types";
 import { novaTrimSpeech, trimDecisionsToBudget } from "../game/trimBudget";
+import { resetMissionGuide } from "../game/tutorial/session";
 import { defaultDecisions } from "./powerMath";
 
 export type Phase =
@@ -237,7 +238,7 @@ export function useGameSession(): GameSession {
   const [legendReturn, setLegendReturn] = useState<Phase>("welcome");
   const [commsYesterday, setCommsYesterday] = useState(false);
   const [novaLine, setNovaLine] = useState(
-    "Stand on a glowing circle to turn a machine on. Bed ends the day.",
+    "Drag power chips onto machines. Drag Nova into bed to end the day.",
   );
   const [sheltering, setSheltering] = useState(false);
   const endingLock = useRef(false);
@@ -327,6 +328,7 @@ export function useGameSession(): GameSession {
       setLastDecisions(null);
       setDeltas([]);
       endingLock.current = false;
+      resetMissionGuide();
       // Walk-the-base day loop (no Plan-day popup).
       setPhase("base");
     } catch (err) {
@@ -404,13 +406,19 @@ export function useGameSession(): GameSession {
     [schedule],
   );
 
-  /** End day from bed circle: shelter flag picks storm A/B; other days prefer A. */
+  /**
+   * End day from bed. Phaser shows the consequence overlay, then calls
+   * continueAfterResult (no auto-advance timeout).
+   */
   const endDayFromWorld = useCallback((): ResourceDelta[] => {
     if (!state || !todaysEvent || !rng || endingLock.current) return [];
     endingLock.current = true;
     const before = state;
     const isStorm = todaysEvent.stormSeverity !== undefined;
-    let pick: "A" | "B" = isStorm ? (sheltering ? "A" : "B") : "A";
+    const crewN = decisions.shelteredCrewCount;
+    const allIn =
+      crewN !== undefined ? crewN >= 3 : sheltering;
+    let pick: "A" | "B" = isStorm ? (allIn ? "A" : "B") : "A";
     if (!isStorm && decisions.scienceLevel > 0) {
       const aWipe = todaysEvent.optionA.effects.scienceThatDay === 0;
       const bWipe = todaysEvent.optionB.effects.scienceThatDay === 0;
@@ -423,11 +431,9 @@ export function useGameSession(): GameSession {
     setLastResult(result);
     setDeltas(nextDeltas);
     setState(result.state);
-    window.setTimeout(() => {
-      advanceFromResult(result, decisions);
-    }, 1600);
+    // Consequence overlay in Phaser calls continueAfterResult when tapped.
     return nextDeltas;
-  }, [state, todaysEvent, rng, sheltering, decisions, advanceFromResult]);
+  }, [state, todaysEvent, rng, sheltering, decisions]);
 
   const chooseEvent = useCallback(
     (choice: "A" | "B") => {
@@ -446,7 +452,10 @@ export function useGameSession(): GameSession {
 
   const continueAfterResult = useCallback(() => {
     if (!lastResult) return;
-    advanceFromResult(lastResult, lastDecisions ?? decisions);
+    const used = lastDecisions ?? decisions;
+    const result = lastResult;
+    endingLock.current = false;
+    advanceFromResult(result, used);
   }, [lastResult, lastDecisions, decisions, advanceFromResult]);
 
   const replay = useCallback(() => {
@@ -470,8 +479,9 @@ export function useGameSession(): GameSession {
     setAfterStormOpen(false);
     setCommsYesterday(false);
     setSheltering(false);
-    setNovaLine("Stand on a glowing circle to turn a machine on. Bed ends the day.");
+    setNovaLine("Drag power chips onto machines. Drag Nova into bed to end the day.");
     endingLock.current = false;
+    resetMissionGuide();
     setPhase("site");
   }, []);
 

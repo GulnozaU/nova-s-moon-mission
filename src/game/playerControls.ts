@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 
-const SPEED = 220;
+/** Fast enough that compact rooms stay under ~3s door-to-door. */
+const SPEED = 280;
 
 export type ControlKeys = {
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;

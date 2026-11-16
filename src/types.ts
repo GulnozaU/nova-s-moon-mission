@@ -40,7 +40,7 @@ export type DayLog = {
 export type GameState = {
   day: number; // 1..10
   site: SiteId;
-  battery: number; // stored power chips, cap 20
+  battery: number; // stored power chips, cap 12
   water: number; // start 40
   oxygen: number; // start 30
   materials: number; // start 10

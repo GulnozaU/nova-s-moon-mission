@@ -3,12 +3,19 @@ import { BootScene } from "./scenes/BootScene";
 import { BaseWorldScene } from "./scenes/BaseWorldScene";
 import { IndoorScene } from "./scenes/IndoorScene";
 
-/** Classic 16:9 adventure canvas (stable FIT scale — no DPR resize thrash). */
+/**
+ * Compact 16:9 stage. Backing store uses devicePixelRatio for crispness
+ * without changing world coordinates (avoids resize thrash).
+ */
 export function createMoonGame(parent: HTMLElement): Phaser.Game {
   const width = 960;
   const height = 540;
+  const dpr =
+    typeof window !== "undefined"
+      ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
+      : 1;
 
-  return new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
     width,
@@ -27,9 +34,16 @@ export function createMoonGame(parent: HTMLElement): Phaser.Game {
     render: {
       antialias: true,
       pixelArt: false,
-      roundPixels: true,
+      roundPixels: false,
+      ...( { resolution: dpr } as object),
     },
     scene: [BootScene, BaseWorldScene, IndoorScene],
     input: { keyboard: true, mouse: true, touch: true },
+    callbacks: {
+      postBoot: (g) => {
+        if (g.canvas) g.canvas.style.imageRendering = "auto";
+      },
+    },
   });
+  return game;
 }

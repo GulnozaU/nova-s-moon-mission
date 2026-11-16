@@ -123,7 +123,8 @@ export const DIFFICULTY: DifficultyConfig = {
   startOxygen: 18,
   startMaterials: 10,
   startBattery: 0,
-  batteryCap: 20,
+  // Unused chips carry over; hard cap so kids cannot hoard forever. ASSUMPTION (Stage jobs).
+  batteryCap: 12,
 
   heatCost: 2,
   unpoweredHeatExposure: 5,

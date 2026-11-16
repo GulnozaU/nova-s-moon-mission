@@ -71,17 +71,14 @@ export function trimDecisionsToBudget(
 }
 
 export function novaTrimSpeech(turnedOff: string[], day = 1): string {
-  const goal =
-    day === 1
-      ? ` Success means last 10 days and Science goal: 0 / ${SCIENCE_SUCCESS_TARGET}.`
-      : "";
+  if (day === 1) {
+    return `Follow the arrow. Last 10 days + science ${SCIENCE_SUCCESS_TARGET}.`;
+  }
   if (turnedOff.length === 0) {
-    return (
-      "Stand on a glowing circle to turn a machine on. Bed ends the day." + goal
-    );
+    return `Day ${day}: I'll brief you. Pick a plan, then go do it.`;
   }
   if (turnedOff.length === 1) {
-    return `Not enough power for ${turnedOff[0]}. I turned it off.` + goal;
+    return `Not enough power for ${turnedOff[0]}. I turned it off.`;
   }
-  return `Not enough power. I turned off: ${turnedOff.join(", ")}.` + goal;
+  return `Not enough power. I turned off: ${turnedOff.join(", ")}.`;
 }

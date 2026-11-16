@@ -1,6 +1,7 @@
 import type { DayDecisions } from "../engine/types";
 import type { Event, GameState, SourceBadge } from "../types";
 import type { StormAlert } from "../content/schedule";
+import type { OsdrStudy } from "../data/osdrTypes";
 
 export type PlayMode = "explore" | "power" | "choose" | "result" | "ending";
 
@@ -29,6 +30,10 @@ export type MoonBridge = {
   /** Radio was ON at the end of the previous day. */
   getCommsYesterday: () => boolean;
   getNovaLine: () => string;
+  /** Real OSDR study (prefer OSD-476 greenhouse finding). */
+  getOsdrStudy: () => OsdrStudy | null;
+  /** Plain-language storm brief for the lab wall screen. */
+  getStormBrief: () => string;
   ready: () => boolean;
   patchDecisions: (patch: Partial<DayDecisions>) => void;
   setDecisions: (d: DayDecisions) => void;
@@ -90,6 +95,8 @@ function stubBridge(): MoonBridge {
     getTomorrowHint: () => "",
     getCommsYesterday: () => false,
     getNovaLine: () => "",
+    getOsdrStudy: () => null,
+    getStormBrief: () => "",
     ready: () => false,
     patchDecisions: () => undefined,
     setDecisions: () => undefined,

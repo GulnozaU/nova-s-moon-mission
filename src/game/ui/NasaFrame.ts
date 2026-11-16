@@ -6,14 +6,17 @@ import { THEME } from "../theme";
 
 /**
  * Soft 2D photo frame that rotates NASA stills by day / event.
+ * Lab wall prefers the real storm still when a warning or storm day is active.
  */
 export class NasaFrame {
   private root: Phaser.GameObjects.Container;
   private photo!: Phaser.GameObjects.Image;
   private caption!: Phaser.GameObjects.Text;
   private lastKey = "";
+  private preferStorm: boolean;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, preferStorm = false) {
+    this.preferStorm = preferStorm;
     this.root = scene.add.container(x, y).setDepth(55);
 
     const mat = scene.add
@@ -30,7 +33,7 @@ export class NasaFrame {
       })
       .setOrigin(0.5);
     const tag = scene.add
-      .text(0, -62, "NASA picture", {
+      .text(0, -62, "NASA wall screen", {
         fontFamily: THEME.fontDisplay,
         fontSize: "11px",
         color: THEME.ink,
@@ -47,9 +50,13 @@ export class NasaFrame {
       const b = bridge();
       const event = b.getEvent();
       const day = b.getDay();
-      const mode = b.getMode();
-      const img =
-        mode === "choose" && event
+      const alerts = b.getStormAlerts();
+      const stormy =
+        this.preferStorm &&
+        (event?.stormSeverity !== undefined || alerts.length > 0);
+      const img = stormy
+        ? nasaImageForContext(event?.id ?? "storm", day)
+        : event
           ? nasaImageForContext(event.id, day)
           : nasaImageForDay(day);
       const key = `nasa_${img.slot}`;
@@ -58,7 +65,9 @@ export class NasaFrame {
         this.photo.setTexture(key).setDisplaySize(148, 100);
       }
       this.caption.setText(
-        nasaKidCaption(img, { eventDate: event?.eventDate }),
+        nasaKidCaption(img, {
+          eventDate: event?.eventDate ?? alerts[0]?.eventDate,
+        }),
       );
     } catch {
       /* bridge */
