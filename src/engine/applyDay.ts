@@ -12,6 +12,7 @@ import {
   LOSE_OXYGEN_AT,
   LOSE_WATER_AT,
   MISSION_DAYS,
+  SCIENCE_SUCCESS_TARGET,
   OXYGEN_MAKER_COST,
   OXYGEN_MAKER_GAIN,
   OXYGEN_MAKER_WATER,
@@ -305,7 +306,7 @@ export function applyDay(
   if (!heatPowered) {
     exposure += UNPOWERED_HEAT_EXPOSURE;
     notes.push(
-      `Crew risk +${UNPOWERED_HEAT_EXPOSURE}: heat had no power.`,
+      `Crew risk +${UNPOWERED_HEAT_EXPOSURE}: heat had no power, so the crew took more storm energy.`,
     );
   }
 
@@ -313,7 +314,7 @@ export function applyDay(
   if (shieldLevel <= 0 && UNSHIELDED_DAILY_EXPOSURE > 0) {
     exposure += UNSHIELDED_DAILY_EXPOSURE;
     notes.push(
-      `Crew risk +${UNSHIELDED_DAILY_EXPOSURE}: no storm shields on the base yet.`,
+      `Crew risk +${UNSHIELDED_DAILY_EXPOSURE}: without shields, the crew slowly takes more storm energy each day.`,
     );
   }
 
@@ -323,13 +324,15 @@ export function applyDay(
     exposure += delta;
     notes.push(
       sheltered
-        ? `Crew risk +${delta.toFixed(1)}: storm hit while sheltered.`
-        : `Crew risk +${delta.toFixed(1)}: storm hit while outside.`,
+        ? `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was in shelter.`
+        : `Crew risk +${delta.toFixed(1)}: a storm hit while the crew was outside.`,
     );
   } else if (scienceLevelsRun > 0 && !sheltered) {
     const delta = normalOutsideExposure();
     exposure += delta;
-    notes.push(`Crew risk +${delta}: crew worked outside.`);
+    notes.push(
+      `Crew risk +${delta}: the crew walked outside for science.`,
+    );
   }
 
   let next: GameState = {
@@ -394,8 +397,18 @@ export function applyDay(
   next.battery = Math.min(BATTERY_CAP, Math.max(0, next.battery));
 
   const lost = isLost(next);
-  const finishedMission = working.day >= MISSION_DAYS && !lost;
-  const nextDay = lost || finishedMission ? working.day : working.day + 1;
+  const survived = working.day >= MISSION_DAYS && !lost;
+  const won = survived && next.science >= SCIENCE_SUCCESS_TARGET;
+  const nextDay = lost || survived ? working.day : working.day + 1;
+  if (survived && !won) {
+    notes.push(
+      `Survived 10 days, but science ${next.science} is under the goal of ${SCIENCE_SUCCESS_TARGET}.`,
+    );
+  } else if (won) {
+    notes.push(
+      `Mission success: survived and reached ${next.science} science (goal ${SCIENCE_SUCCESS_TARGET}).`,
+    );
+  }
 
   const dayLog: DayLog = {
     day: working.day,
@@ -431,7 +444,8 @@ export function applyDay(
     state: newState,
     dayLog,
     lost,
-    won: finishedMission,
+    survived,
+    won,
   };
 }
 

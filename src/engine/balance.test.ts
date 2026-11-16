@@ -3,12 +3,18 @@ import { optionDominates, optionsAreIdentical, STATIC_EVENTS } from "../content/
 import { scheduleMissionEvents } from "../content/schedule";
 import { archivedSpaceWeather } from "../data/donki";
 import {
+  bestFixedStrategyForSite,
+  FIXED_STRATEGY_IDS,
   formatWinRateTable,
   playStrategy,
   runBalance,
   STRATEGY_IDS,
 } from "./balance";
-import { SHELTER_EXPOSURE_FACTOR, STORM_EXPOSURE_PER_SEVERITY } from "./constants";
+import {
+  SCIENCE_SUCCESS_TARGET,
+  SHELTER_EXPOSURE_FACTOR,
+  STORM_EXPOSURE_PER_SEVERITY,
+} from "./constants";
 import { stormExposureDelta } from "./exposure";
 
 describe("shelter dominance", () => {
@@ -64,22 +70,68 @@ describe("event trade-offs", () => {
   });
 });
 
-describe("balance win rates", () => {
-  it("keeps strategies between ~10% and ~90% win rate (50 seeds smoke)", () => {
-    const rows = runBalance(50);
-    // eslint-disable-next-line no-console
-    console.log("\n" + formatWinRateTable(rows) + "\n");
-    for (const row of rows) {
-      expect(row.winRate, `${row.strategy}@${row.site}`).toBeGreaterThanOrEqual(
-        0.05,
-      );
-      expect(row.winRate, `${row.strategy}@${row.site}`).toBeLessThanOrEqual(0.95);
-    }
+describe("mission success goal", () => {
+  it("defines a science success target", () => {
+    expect(SCIENCE_SUCCESS_TARGET).toBeGreaterThan(0);
   });
 
-  it("playStrategy uses real schedule storms", () => {
-    const result = playStrategy("balanced", "rim", 7);
+  it("all_safety cannot succeed (no science)", () => {
+    for (const site of ["rim", "plain"] as const) {
+      for (let s = 0; s < 20; s++) {
+        const r = playStrategy("all_safety", site, s + 100);
+        expect(r.won, `${site} seed ${s}`).toBe(false);
+        if (r.survived) expect(r.science).toBeLessThan(SCIENCE_SUCCESS_TARGET);
+      }
+    }
+  });
+});
+
+describe("smart bot vs fixed strategies (Stage 1b)", () => {
+  it(
+    "smart ≥85% success on both sites and beats best fixed by ≥15pp; fixed ≤60%",
+    () => {
+      const rows = runBalance(500);
+      // eslint-disable-next-line no-console
+      console.log("\n" + formatWinRateTable(rows) + "\n");
+
+      for (const site of ["rim", "plain"] as const) {
+        const smart = rows.find((r) => r.strategy === "smart" && r.site === site)!;
+        expect(smart.successRate, `smart@${site}`).toBeGreaterThanOrEqual(0.85);
+
+        for (const id of FIXED_STRATEGY_IDS) {
+          const row = rows.find((r) => r.strategy === id && r.site === site)!;
+          expect(
+            row.successRate,
+            `${id}@${site} success=${row.successRate}`,
+          ).toBeLessThanOrEqual(0.6);
+        }
+
+        const bestId = bestFixedStrategyForSite(rows, site);
+        const best = rows.find((r) => r.strategy === bestId && r.site === site)!;
+        expect(
+          smart.successRate - best.successRate,
+          `smart vs ${bestId}@${site}`,
+        ).toBeGreaterThanOrEqual(0.15);
+
+        const balanced = rows.find(
+          (r) => r.strategy === "balanced" && r.site === site,
+        )!;
+        const random = rows.find(
+          (r) => r.strategy === "random" && r.site === site,
+        )!;
+        expect(
+          balanced.successRate,
+          `balanced vs random@${site}`,
+        ).toBeGreaterThanOrEqual(random.successRate - 0.001);
+      }
+    },
+    90_000,
+  );
+
+  it("playStrategy returns survive and success flags", () => {
+    const result = playStrategy("smart", "rim", 7);
+    expect(typeof result.survived).toBe("boolean");
     expect(typeof result.won).toBe("boolean");
-    expect(STRATEGY_IDS).toContain("balanced");
+    expect(STRATEGY_IDS).toContain("smart");
   });
 });

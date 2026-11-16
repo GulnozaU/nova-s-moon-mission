@@ -14,7 +14,9 @@ export {
   playStrategy,
   formatWinRateTable,
   bestStrategyForSite,
+  bestFixedStrategyForSite,
   STRATEGY_IDS,
+  FIXED_STRATEGY_IDS,
 } from "./balance";
 export * from "./constants";
 export type {
@@ -23,7 +25,7 @@ export type {
   DayDecisions,
   StormEvent,
 } from "./types";
-export type { StrategyId, BalanceRow } from "./balance";
+export type { StrategyId, BalanceRow, PlayResult } from "./balance";
 export type {
   AuditedDecisionGroup,
   AuditedOption,

@@ -5,11 +5,17 @@ import {
   findEmptyBenefitOrCost,
 } from "./audit";
 import {
-  bestStrategyForSite,
+  bestFixedStrategyForSite,
+  FIXED_STRATEGY_IDS,
   formatWinRateTable,
   runBalance,
 } from "./balance";
-import { DIFFICULTY, GREENHOUSE_COST, GREENHOUSE_WATER } from "./constants";
+import {
+  DIFFICULTY,
+  GREENHOUSE_COST,
+  GREENHOUSE_WATER,
+  SCIENCE_SUCCESS_TARGET,
+} from "./constants";
 
 describe("decision audit (Section 3.9)", () => {
   it("fails if any decision has an empty benefit or cost", () => {
@@ -32,32 +38,45 @@ describe("decision audit (Section 3.9)", () => {
   });
 });
 
-describe("balance (SPEC 6b)", () => {
+describe("balance (Stage 1b)", () => {
   it(
-    "500 seeds × 5 strategies stay within 10%..90% win rate",
+    "smart beats fixed strategies; fixed success ≤60%; print survive+success table",
     () => {
       const rows = runBalance(500);
-      // Print for the human (Prompt 1b step 6)
       // eslint-disable-next-line no-console
       console.log("\n" + formatWinRateTable(rows) + "\n");
+      // eslint-disable-next-line no-console
+      console.log(`scienceSuccessTarget=${SCIENCE_SUCCESS_TARGET}`);
 
-      for (const row of rows) {
-        expect(
-          row.winRate,
-          `${row.strategy}@${row.site} winRate=${row.winRate}`,
-        ).toBeGreaterThanOrEqual(0.1);
-        expect(
-          row.winRate,
-          `${row.strategy}@${row.site} winRate=${row.winRate}`,
-        ).toBeLessThanOrEqual(0.9);
+      for (const site of ["rim", "plain"] as const) {
+        const smart = rows.find((r) => r.strategy === "smart" && r.site === site)!;
+        expect(smart.successRate, `smart@${site}`).toBeGreaterThanOrEqual(0.85);
+
+        for (const id of FIXED_STRATEGY_IDS) {
+          const row = rows.find((r) => r.strategy === id && r.site === site)!;
+          expect(row.successRate, `${id}@${site}`).toBeLessThanOrEqual(0.6);
+        }
+
+        const bestId = bestFixedStrategyForSite(rows, site);
+        const best = rows.find((r) => r.strategy === bestId && r.site === site)!;
+        expect(smart.successRate - best.successRate).toBeGreaterThanOrEqual(0.15);
+
+        const balanced = rows.find(
+          (r) => r.strategy === "balanced" && r.site === site,
+        )!;
+        const random = rows.find(
+          (r) => r.strategy === "random" && r.site === site,
+        )!;
+        expect(balanced.successRate).toBeGreaterThanOrEqual(
+          random.successRate - 0.001,
+        );
       }
 
-      const bestRim = bestStrategyForSite(rows, "rim");
-      const bestPlain = bestStrategyForSite(rows, "plain");
-      // eslint-disable-next-line no-console
-      console.log(`best rim=${bestRim} best plain=${bestPlain}`);
-      expect(bestRim).not.toBe(bestPlain);
+      const allSafety = rows.filter((r) => r.strategy === "all_safety");
+      for (const row of allSafety) {
+        expect(row.successRate, `all_safety@${row.site}`).toBe(0);
+      }
     },
-    60_000,
+    90_000,
   );
 });

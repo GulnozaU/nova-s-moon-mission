@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ApplyDayResult } from "../../engine/types";
 import type { GameState } from "../../types";
+import { SCIENCE_SUCCESS_TARGET } from "../../engine/constants";
 import { causeEffectFromLog, quizFromState } from "../../content/debrief";
 import { rankFromState } from "../../content/rank";
 import { SourceBadge } from "../SourceBadge";
@@ -17,6 +18,7 @@ type Props = {
 
 export function EndReport({ state, result, onReplay, onLegend }: Props) {
   const won = Boolean(result?.won);
+  const survived = Boolean(result?.survived);
   const rank = useMemo(() => rankFromState(state, won), [state, won]);
   const stories = useMemo(() => causeEffectFromLog(state), [state]);
   const quiz = useMemo(() => quizFromState(state, won), [state, won]);
@@ -28,8 +30,10 @@ export function EndReport({ state, result, onReplay, onLegend }: Props) {
   }, 0);
 
   const blurb = won
-    ? `You finished! Rank: ${rank.title}.`
-    : `Mission stopped. Rank: ${rank.title}.`;
+    ? `You succeeded! Science ${state.science} met the goal of ${SCIENCE_SUCCESS_TARGET}. Rank: ${rank.title}.`
+    : survived
+      ? `You lasted 10 days, but science ${state.science} is under the goal of ${SCIENCE_SUCCESS_TARGET}. Rank: ${rank.title}.`
+      : `Mission stopped. Rank: ${rank.title}.`;
 
   return (
     <section className="panel end-report">
@@ -38,14 +42,50 @@ export function EndReport({ state, result, onReplay, onLegend }: Props) {
         alt=""
         className="end-art bounce"
       />
-      <h2>{won ? "Mission complete!" : "Mission review"}</h2>
+      <h2>
+        {won
+          ? "Mission success!"
+          : survived
+            ? "Survived — science goal missed"
+            : "Mission review"}
+      </h2>
       <p className="rank-banner">
         Rank: <strong>{rank.title}</strong> <SourceBadge badge="ASSUMPTION" />
+      </p>
+      <p>
+        Goal: last 10 days and earn at least {SCIENCE_SUCCESS_TARGET} science.{" "}
+        <SourceBadge badge="ASSUMPTION" /> You have {state.science}.
       </p>
       <p>
         <SpaceText text={rank.why} />
       </p>
       <ReadAloudButton text={`${blurb} ${rank.why}`} />
+
+      <h3>Where crew risk came from</h3>
+      <ul className="ce-list">
+        <li>
+          <strong>No shields</strong>
+          <span>
+            → Without shields, the crew slowly takes more storm energy each day.
+          </span>
+        </li>
+        <li>
+          <strong>Storm outside</strong>
+          <span>→ A storm hits much harder if the crew stays out.</span>
+        </li>
+        <li>
+          <strong>Storm in shelter</strong>
+          <span>→ Shelter cuts storm energy a lot, but science that day is 0.</span>
+        </li>
+        <li>
+          <strong>Science walks</strong>
+          <span>→ Walking outside for science adds a little risk.</span>
+        </li>
+        <li>
+          <strong>Heat off</strong>
+          <span>→ If heat has no power, the crew takes more storm energy.</span>
+        </li>
+      </ul>
 
       <h3>Cause and effect from your log</h3>
       <ul className="ce-list">

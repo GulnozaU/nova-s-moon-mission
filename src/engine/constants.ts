@@ -103,6 +103,12 @@ export type DifficultyConfig = {
   loseWaterAt: number;
   loseOxygenAt: number;
   loseExposureAt: number;
+
+  /**
+   * Mission success = survive all days AND science ≥ this.
+   * Forces players (and bots) to do science, not only hide. ASSUMPTION (Stage 1b).
+   */
+  scienceSuccessTarget: number;
 };
 
 /**
@@ -111,9 +117,9 @@ export type DifficultyConfig = {
  */
 export const DIFFICULTY: DifficultyConfig = {
   missionDays: 10,
-  // Tight enough that skip-cleaner and delayed leaks matter. ASSUMPTION (Stage 1).
-  startWater: 40,
-  // Plain nights without the air maker must hurt (5 nights × 3 use). ASSUMPTION (Stage 1).
+  // Tighter tanks — wasteful fixed plans run dry. ASSUMPTION (Stage 1b).
+  startWater: 34,
+  // Plain nights need the air maker; start just above 5×3 night drain. ASSUMPTION (Stage 1b).
   startOxygen: 18,
   startMaterials: 10,
   startBattery: 0,
@@ -146,34 +152,36 @@ export const DIFFICULTY: DifficultyConfig = {
 
   rimPowerPerDay: 8,
   plainDayPower: 8,
-  // Raised from 0 — nights still need heat (2); stops plain auto-fail from unpowered exposure. ASSUMPTION (balance pass).
-  plainNightPower: 2,
+  // Nights: heat2; banked battery covers recycler + air. ASSUMPTION (Stage 1b).
+  plainNightPower: 4,
   plainLitDays: 5,
 
   shieldMaterialCost: 2,
   shieldLevelMax: 4,
-  // Lowered from 0.2 — need more investment for the same protection. ASSUMPTION (balance pass).
   shieldReductionPerLevel: 0.15,
 
   panelMaterialCost: 3,
   panelPowerBonus: 1,
 
-  // Sev-3 unsheltered = 48, near loseExposureAt. ASSUMPTION (Stage 1).
+  // Sev-3 unsheltered = 48, near loseExposureAt. ASSUMPTION (Stage 1b).
   stormExposurePerSeverity: 16,
-  // Shelter keeps ~30% of storm exposure (cuts ≥50% vs staying out). ASSUMPTION (Stage 1).
+  // Shelter keeps ~30% (≥50% cut vs out). ASSUMPTION (Stage 1).
   shelterExposureFactor: 0.3,
-  // Outdoor science risk per day. ASSUMPTION (Stage 1).
+  // Outdoor science risk. ASSUMPTION (Stage 1b).
   normalOutsideExposure: 2,
-  // Unshielded habitat creep — makes pure shelter-only fail rough weeks. ASSUMPTION (Stage 1).
-  unshieldedDailyExposure: 3,
+  // Unshielded daily creep — rewards building before storms. ASSUMPTION (Stage 1b).
+  unshieldedDailyExposure: 3.5,
 
   cleanFilterMaterialCost: 1, // ASSUMPTION
   cleanFilterPowerCost: 1, // ASSUMPTION
 
   loseWaterAt: 0,
   loseOxygenAt: 0,
-  // Sev-3 out (48) is near-fatal; sev-2 (32) is costly. ASSUMPTION (Stage 1).
-  loseExposureAt: 55,
+  // Sev-3 out (48) is near-fatal. ASSUMPTION (Stage 1b).
+  loseExposureAt: 52,
+
+  // Above casual science-1 totals on plain; needs planned walks. ASSUMPTION (Stage 1b).
+  scienceSuccessTarget: 14,
 };
 
 /** Named aliases so existing engine modules keep reading the same symbols. */
@@ -219,6 +227,7 @@ export const CLEAN_FILTER_POWER_COST = DIFFICULTY.cleanFilterPowerCost;
 export const LOSE_WATER_AT = DIFFICULTY.loseWaterAt;
 export const LOSE_OXYGEN_AT = DIFFICULTY.loseOxygenAt;
 export const LOSE_EXPOSURE_AT = DIFFICULTY.loseExposureAt;
+export const SCIENCE_SUCCESS_TARGET = DIFFICULTY.scienceSuccessTarget;
 
 /** Single mode name for UI / reports (SPEC 6d). */
 export const GAME_MODE = "standard" as const;

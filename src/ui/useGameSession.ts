@@ -351,7 +351,7 @@ export function useGameSession(): GameSession {
 
   const continueAfterResult = useCallback(() => {
     if (!lastResult || !schedule) return;
-    if (lastResult.lost || lastResult.won) {
+    if (lastResult.lost || lastResult.survived) {
       setPhase("end");
       return;
     }

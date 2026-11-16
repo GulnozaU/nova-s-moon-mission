@@ -25,7 +25,12 @@ export type ApplyDayResult = {
   dayLog: import("../types").DayLog;
   /** True if water/oxygen/exposure lose conditions were hit. */
   lost: boolean;
-  /** True after successfully completing mission day 10. */
+  /** Survived all mission days (may still miss the science goal). */
+  survived: boolean;
+  /**
+   * Mission success: survived AND science ≥ SCIENCE_SUCCESS_TARGET.
+   * ASSUMPTION target lives in constants.ts.
+   */
   won: boolean;
 };
 
