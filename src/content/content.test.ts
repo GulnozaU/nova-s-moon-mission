@@ -99,15 +99,15 @@ describe("seeded schedule", () => {
     expect(idsA).not.toEqual(idsB);
   });
 
-  it("comms ON shows longer storm alerts than OFF", () => {
+  it("storm alerts only appear when radio (comms) was on", () => {
     const weather = archivedSpaceWeather("X");
     const sched = scheduleMissionEvents(7, weather);
     const storm = sched.storms[0]!;
     const day = Math.max(1, storm.day - storm.warningDays);
     const on = stormAlertsForDay(sched, day, true);
     const off = stormAlertsForDay(sched, day, false);
-    expect(on.length).toBeGreaterThanOrEqual(off.length);
-    if (storm.warningDays >= 2) {
+    expect(off).toHaveLength(0);
+    if (storm.warningDays >= 1) {
       expect(on.some((a) => a.stormDay === storm.day)).toBe(true);
     }
   });

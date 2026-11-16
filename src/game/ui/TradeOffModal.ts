@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import { plannedPowerCost } from "../../ui/powerMath";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../../engine/constants";
 import type { DayDecisions } from "../../engine/types";
 import { THEME } from "../theme";
+import { sparkBurst } from "../anim";
 
 type Job = {
   key: keyof DayDecisions | "heat";
@@ -235,10 +237,14 @@ export class TradeOffModal {
         fontStyle: "bold",
       })
       .setOrigin(0.5);
-    bg.on("pointerover", () => bg.setScale(1.04));
+    bg.on("pointerover", () => {
+      bg.setScale(1.04);
+      audio.play("uiHover");
+    });
     bg.on("pointerout", () => bg.setScale(1));
     bg.on("pointerdown", () => {
       bg.setScale(0.96);
+      audio.play("uiClick");
       fn();
     });
     bg.on("pointerup", () => bg.setScale(1.04));
@@ -252,24 +258,32 @@ export class TradeOffModal {
     if (key === "cleanFilter" && !d.cleanFilter) {
       if ((bridge().getState().recyclerEfficiency ?? 1) >= 1) return;
     }
-    bridge().patchDecisions({ [key]: !Boolean(d[key]) });
+    const next = !Boolean(d[key]);
+    bridge().patchDecisions({ [key]: next });
+    audio.play(next ? "toggleOn" : "toggleOff");
+    if (key === "recycler" && next) audio.play("waterTrickle");
+    if (key === "oxygenMaker" && next) audio.play("airHiss");
+    if (key === "comms" && next) audio.play("powerHum");
+    if (key === "greenhouse" && next) audio.play("plantSparkle");
+    sparkBurst(this.scene, this.scene.scale.width / 2, this.scene.scale.height / 2 - 40);
     this.refresh();
   }
 
   private bumpScience(delta: number) {
     const d = bridge().getDecisions();
-    bridge().patchDecisions({
-      scienceLevel: Math.min(
-        SCIENCE_LEVEL_MAX,
-        Math.max(0, d.scienceLevel + delta),
-      ),
-    });
+    const next = Math.min(
+      SCIENCE_LEVEL_MAX,
+      Math.max(0, d.scienceLevel + delta),
+    );
+    bridge().patchDecisions({ scienceLevel: next });
+    audio.play(delta > 0 ? "toggleOn" : "toggleOff");
     this.refresh();
   }
 
   show() {
     this.open = true;
     this.root.setVisible(true);
+    audio.play("uiClick");
     this.refresh();
   }
 

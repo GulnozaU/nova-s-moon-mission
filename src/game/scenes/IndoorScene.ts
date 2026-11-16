@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import {
   actionJustPressed,
@@ -9,12 +10,26 @@ import {
 import {
   COMMS_COST,
   GREENHOUSE_COST,
+  LOSE_OXYGEN_AT,
+  LOSE_WATER_AT,
   OXYGEN_MAKER_COST,
   RECYCLER_COST,
   SCIENCE_COST_PER_LEVEL,
   SCIENCE_LEVEL_MAX,
+  START_OXYGEN,
+  START_WATER,
 } from "../../engine/constants";
-import { addShadow, idleBreathe, sparkBurst, walkHop } from "../anim";
+import {
+  addShadow,
+  animateTankLevel,
+  dustPuff,
+  fadeSlideIn,
+  idleBreathe,
+  oxygenBubbles,
+  setPlantHealth,
+  sparkBurst,
+  walkHop,
+} from "../anim";
 import { THEME } from "../theme";
 
 type RoomId = "home" | "greenhouse" | "lab";
@@ -52,6 +67,14 @@ export class IndoorScene extends Phaser.Scene {
   private shadowSync!: () => void;
   private walkSync!: () => void;
   private plants: Spot[] = [];
+  private lastFootstep = 0;
+  private waterTankFill: Phaser.GameObjects.Rectangle | null = null;
+  private oxyTankFill: Phaser.GameObjects.Rectangle | null = null;
+  private bubbleTimer: Phaser.Time.TimerEvent | null = null;
+  private lastTankWater = -1;
+  private lastTankOxy = -1;
+  private lastGreenhouse: boolean | null = null;
+  private lastOxyMaker: boolean | null = null;
 
   constructor() {
     super("indoor");
@@ -61,10 +84,13 @@ export class IndoorScene extends Phaser.Scene {
     this.room = data.room ?? "home";
     this.held = null;
     this.plants = [];
+    this.bubbleTimer?.remove(false);
+    this.bubbleTimer = null;
   }
 
   create() {
     const { width: W, height: H } = this.scale;
+    fadeSlideIn(this, true);
     // Stylized 2D room — photo as soft wallpaper only
     const bgKey =
       this.room === "home" ? "bunks" : this.room === "greenhouse" ? "greenhouseIn" : "labIn";
@@ -78,9 +104,10 @@ export class IndoorScene extends Phaser.Scene {
     if (this.room === "home") this.buildHome(W, H);
     if (this.room === "greenhouse") this.buildGreenhouse(W, H);
     if (this.room === "lab") this.buildLab(W, H);
-    this.addSpot("exit", "Leave →", W * 0.5, H * 0.9, 0x5a3a1a, () =>
-      this.scene.start("base"),
-    );
+    this.addSpot("exit", "Leave →", W * 0.5, H * 0.9, 0x5a3a1a, () => {
+      audio.play("door");
+      this.scene.start("base");
+    });
 
     this.player = this.physics.add
       .sprite(W * 0.5, H * 0.75, "nova")
@@ -94,7 +121,14 @@ export class IndoorScene extends Phaser.Scene {
     const sh = addShadow(this, this.player);
     this.shadowSync = sh.sync;
     idleBreathe(this, this.player);
-    this.walkSync = walkHop(this.player).sync;
+    this.walkSync = walkHop(this.player, (x, y) => {
+      dustPuff(this, x, y);
+      const now = this.time.now;
+      if (now - this.lastFootstep > 280) {
+        this.lastFootstep = now;
+        audio.play("footstep");
+      }
+    }).sync;
 
     this.keys = makeKeys(this);
     this.buildPad();
@@ -148,12 +182,14 @@ export class IndoorScene extends Phaser.Scene {
   }
 
   private buildHome(W: number, H: number) {
+    this.addTankMeters(W, H);
     this.addSpot("bunk", "Beds (rest)", W * 0.78, H * 0.5, 0x6b5a4a, () =>
       this.say("Beds are for sleep and storm shelter — not the air maker."),
     );
     this.addSpot("wrench", "Grab wrench", W * 0.14, H * 0.7, THEME.accent, () => {
       this.setHeld("wrench");
       this.say("Wrench ready! Click a machine.");
+      audio.play("uiClick");
       sparkBurst(this, this.player.x, this.player.y - 20);
     });
     this.addSpot(
@@ -165,11 +201,14 @@ export class IndoorScene extends Phaser.Scene {
       () => {
         if (!this.need("wrench")) return;
         const d = bridge().getDecisions();
-        bridge().patchDecisions({ recycler: !d.recycler });
+        const next = !d.recycler;
+        bridge().patchDecisions({ recycler: next });
         this.setHeld(null);
+        audio.play(next ? "toggleOn" : "toggleOff");
+        if (next) audio.play("waterTrickle");
         sparkBurst(this, W * 0.34, H * 0.56, 0x7ec8ff);
         this.say(
-          !d.recycler
+          next
             ? `Cleaner ON ↑ save water ↓ −${RECYCLER_COST} power`
             : "Cleaner OFF ↑ save power ↓ more water used",
         );
@@ -186,11 +225,14 @@ export class IndoorScene extends Phaser.Scene {
       () => {
         if (!this.need("wrench")) return;
         const d = bridge().getDecisions();
-        bridge().patchDecisions({ oxygenMaker: !d.oxygenMaker });
+        const next = !d.oxygenMaker;
+        bridge().patchDecisions({ oxygenMaker: next });
         this.setHeld(null);
+        audio.play(next ? "toggleOn" : "toggleOff");
+        if (next) audio.play("airHiss");
         sparkBurst(this, W * 0.52, H * 0.54, 0x6dffa0);
         this.say(
-          !d.oxygenMaker
+          next
             ? `Air ON ↑ +O₂ ↓ −${OXYGEN_MAKER_COST} power −1💧`
             : "Air OFF",
         );
@@ -207,11 +249,14 @@ export class IndoorScene extends Phaser.Scene {
       () => {
         if (!this.need("wrench")) return;
         const d = bridge().getDecisions();
-        bridge().patchDecisions({ comms: !d.comms });
+        const next = !d.comms;
+        bridge().patchDecisions({ comms: next });
         this.setHeld(null);
+        audio.play(next ? "toggleOn" : "toggleOff");
+        if (next) audio.play("powerHum");
         sparkBurst(this, W * 0.22, H * 0.48);
         this.say(
-          !d.comms
+          next
             ? `Radio ON ↑ warnings ↓ −${COMMS_COST} power`
             : "Radio OFF",
         );
@@ -259,12 +304,39 @@ export class IndoorScene extends Phaser.Scene {
     bridge().patchDecisions({ greenhouse: next });
     this.setHeld(null);
     if (next) {
+      audio.play("plantSparkle");
+      audio.play("waterTrickle");
       sparkBurst(this, W * 0.55, H * 0.5, 0x7ec8ff);
       this.say(`Watered! ↑ O₂ ↓ −${GREENHOUSE_COST} power −2💧`);
     } else {
+      audio.play("toggleOff");
       this.say("Stopped. Leaves will dry.");
     }
     this.refreshVisuals();
+  }
+
+  private addTankMeters(W: number, H: number) {
+    const tank = (x: number, label: string, color: number) => {
+      this.add
+        .rectangle(x, H * 0.42, 28, 70, 0x2a2218, 0.9)
+        .setStrokeStyle(2, THEME.line, 0.35)
+        .setDepth(7);
+      const fill = this.add
+        .rectangle(x, H * 0.42 + 32, 22, 60, color, 0.85)
+        .setOrigin(0.5, 1)
+        .setDepth(8);
+      this.add
+        .text(x, H * 0.42 - 42, label, {
+          fontFamily: THEME.font,
+          fontSize: "10px",
+          color: THEME.cream,
+        })
+        .setOrigin(0.5)
+        .setDepth(9);
+      return fill;
+    };
+    this.waterTankFill = tank(W * 0.08, "H₂O", 0x3a7ca5);
+    this.oxyTankFill = tank(W * 0.14, "O₂", 0x2f7d4a);
   }
 
   private buildLab(W: number, H: number) {
@@ -287,6 +359,7 @@ export class IndoorScene extends Phaser.Scene {
         const next = Math.min(SCIENCE_LEVEL_MAX, d.scienceLevel + 1);
         bridge().patchDecisions({ scienceLevel: next });
         this.setHeld(null);
+        audio.play("toggleOn");
         sparkBurst(this, W * 0.5, H * 0.54, 0x7ec8ff);
         this.say(`Walk ×${next} ↑ science ↓ −${SCIENCE_COST_PER_LEVEL} power + risk`);
         this.refreshVisuals();
@@ -299,6 +372,7 @@ export class IndoorScene extends Phaser.Scene {
     this.addSpot("undo", "Undo walk", W * 0.75, H * 0.58, 0x8a5a3a, () => {
       const d = bridge().getDecisions();
       bridge().patchDecisions({ scienceLevel: Math.max(0, d.scienceLevel - 1) });
+      audio.play("toggleOff");
       this.refreshVisuals();
     });
   }
@@ -388,12 +462,52 @@ export class IndoorScene extends Phaser.Scene {
   private refreshVisuals() {
     try {
       for (const s of this.spots) s.refresh?.();
-      const on = Boolean(bridge().getDecisions().greenhouse);
-      for (const p of this.plants) {
-        if (!p.plantLeaf) continue;
-        p.plantLeaf.setFillStyle(on ? 0x3a9a4a : 0x8a6a3a);
-        p.plantLeaf.setScale(1, on ? 1 : 0.65);
-        p.plantLeaf.setAngle(on ? 0 : -14);
+      const d = bridge().getDecisions();
+      const on = Boolean(d.greenhouse);
+      if (on !== this.lastGreenhouse) {
+        this.lastGreenhouse = on;
+        for (const p of this.plants) {
+          if (!p.plantLeaf) continue;
+          setPlantHealth(p.plantLeaf, on, this);
+        }
+      }
+      const st = bridge().getState();
+      const water01 =
+        (st.water - LOSE_WATER_AT) / Math.max(1, START_WATER - LOSE_WATER_AT);
+      const oxy01 =
+        (st.oxygen - LOSE_OXYGEN_AT) / Math.max(1, START_OXYGEN - LOSE_OXYGEN_AT);
+      if (this.waterTankFill && Math.abs(water01 - this.lastTankWater) > 0.01) {
+        animateTankLevel(
+          this,
+          this.waterTankFill,
+          this.lastTankWater < 0 ? water01 : this.lastTankWater,
+          water01,
+          60,
+        );
+        this.lastTankWater = water01;
+      }
+      if (this.oxyTankFill && Math.abs(oxy01 - this.lastTankOxy) > 0.01) {
+        animateTankLevel(
+          this,
+          this.oxyTankFill,
+          this.lastTankOxy < 0 ? oxy01 : this.lastTankOxy,
+          oxy01,
+          60,
+        );
+        this.lastTankOxy = oxy01;
+      }
+      if (d.oxygenMaker !== this.lastOxyMaker) {
+        this.lastOxyMaker = d.oxygenMaker;
+        this.bubbleTimer?.remove(false);
+        this.bubbleTimer = null;
+        if (d.oxygenMaker && this.oxyTankFill) {
+          this.bubbleTimer = oxygenBubbles(
+            this,
+            this.oxyTankFill.x,
+            this.oxyTankFill.y - 40,
+            true,
+          );
+        }
       }
     } catch {
       /* */

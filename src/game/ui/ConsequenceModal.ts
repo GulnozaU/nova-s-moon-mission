@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { audio } from "../../audio/audio";
 import { bridge, type BridgeDelta } from "../bridge";
 import { THEME } from "../theme";
 
@@ -98,6 +99,12 @@ export class ConsequenceModal {
     );
     this.root.setVisible(true);
     this.open = true;
+    audio.play("dayEnd");
+    for (const d of deltas) {
+      const delta = d.after - d.before;
+      if (delta > 0) audio.play("resourceUp");
+      else if (delta < 0) audio.play("resourceDown");
+    }
     this.spawnFloaters(deltas);
   }
 

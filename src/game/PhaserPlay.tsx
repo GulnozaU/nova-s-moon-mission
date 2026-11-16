@@ -18,18 +18,19 @@ type Props = {
   deltas: BridgeDelta[];
   stormAlerts: StormAlert[];
   tomorrowHint: string;
-  /** When false, canvas stays mounted but hidden (no destroy between days). */
+  commsYesterday: boolean;
+  novaLine: string;
+  sheltering: boolean;
   visible: boolean;
   onDecisions: (d: DayDecisions | ((p: DayDecisions) => DayDecisions)) => void;
-  onPlanPower: () => void;
-  onReadyForEvent: () => void;
-  onChoose: (c: "A" | "B") => void;
-  onContinueAfterResult: () => void;
+  onNovaLine: (line: string) => void;
+  onSheltering: (on: boolean) => void;
+  onEndDay: () => BridgeDelta[];
   onOpenGlossary: () => void;
 };
 
 /**
- * Full-canvas 2D adventure. Created once per mission; stays mounted Day 1→end.
+ * Full-canvas day loop. Created once per mission; stays mounted Day 1→end.
  */
 export function PhaserPlay({
   state,
@@ -40,12 +41,14 @@ export function PhaserPlay({
   deltas,
   stormAlerts,
   tomorrowHint,
+  commsYesterday,
+  novaLine,
+  sheltering,
   visible,
   onDecisions,
-  onPlanPower,
-  onReadyForEvent,
-  onChoose,
-  onContinueAfterResult,
+  onNovaLine,
+  onSheltering,
+  onEndDay,
   onOpenGlossary,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -59,11 +62,13 @@ export function PhaserPlay({
     deltas,
     stormAlerts,
     tomorrowHint,
+    commsYesterday,
+    novaLine,
+    sheltering,
     onDecisions,
-    onPlanPower,
-    onReadyForEvent,
-    onChoose,
-    onContinueAfterResult,
+    onNovaLine,
+    onSheltering,
+    onEndDay,
     onOpenGlossary,
   });
 
@@ -77,11 +82,13 @@ export function PhaserPlay({
       deltas,
       stormAlerts,
       tomorrowHint,
+      commsYesterday,
+      novaLine,
+      sheltering,
       onDecisions,
-      onPlanPower,
-      onReadyForEvent,
-      onChoose,
-      onContinueAfterResult,
+      onNovaLine,
+      onSheltering,
+      onEndDay,
       onOpenGlossary,
     };
   });
@@ -96,10 +103,12 @@ export function PhaserPlay({
         getPowerSpent: () => plannedPowerCost(latest.current.decisions),
         getState: () => latest.current.state,
         getEvent: () => latest.current.event,
-        getHint: () => "Every ON helps and costs.",
+        getHint: () => "Stand still on a glowing circle. Bed ends the day.",
         getDeltas: () => latest.current.deltas,
         getStormAlerts: () => latest.current.stormAlerts,
         getTomorrowHint: () => latest.current.tomorrowHint,
+        getCommsYesterday: () => latest.current.commsYesterday,
+        getNovaLine: () => latest.current.novaLine,
         ready: () => true,
         patchDecisions: (patch) =>
           latest.current.onDecisions({
@@ -107,13 +116,18 @@ export function PhaserPlay({
             ...patch,
           }),
         setDecisions: (d) => latest.current.onDecisions(d),
-        goPowerCheck: () => latest.current.onPlanPower(),
-        goChoice: () => latest.current.onReadyForEvent(),
-        choose: (c) => latest.current.onChoose(c),
-        continueAfterResult: () => latest.current.onContinueAfterResult(),
+        setNovaLine: (line) => latest.current.onNovaLine(line),
+        setSheltering: (on) => latest.current.onSheltering(on),
+        getSheltering: () => latest.current.sheltering,
+        endDay: () => latest.current.onEndDay(),
+        goPowerCheck: () => undefined,
+        goChoice: () => undefined,
+        choose: () => undefined,
+        continueAfterResult: () => undefined,
         openGlossary: () => latest.current.onOpenGlossary(),
       };
     };
+    // onEndDay returns deltas for in-world floaters.
 
     wire();
     if (!hostRef.current || gameRef.current) return;
@@ -139,13 +153,27 @@ export function PhaserPlay({
       getDeltas: () => latest.current.deltas,
       getStormAlerts: () => latest.current.stormAlerts,
       getTomorrowHint: () => latest.current.tomorrowHint,
+      getCommsYesterday: () => latest.current.commsYesterday,
+      getNovaLine: () => latest.current.novaLine,
+      getSheltering: () => latest.current.sheltering,
       ready: () => true,
-      continueAfterResult: () => latest.current.onContinueAfterResult(),
-      choose: (c) => latest.current.onChoose(c),
-      goChoice: () => latest.current.onReadyForEvent(),
-      goPowerCheck: () => latest.current.onPlanPower(),
+      endDay: () => latest.current.onEndDay(),
+      setNovaLine: (line) => latest.current.onNovaLine(line),
+      setSheltering: (on) => latest.current.onSheltering(on),
     };
-  }, [mode, decisions, event, powerToday, state, deltas, stormAlerts, tomorrowHint]);
+  }, [
+    mode,
+    decisions,
+    event,
+    powerToday,
+    state,
+    deltas,
+    stormAlerts,
+    tomorrowHint,
+    commsYesterday,
+    novaLine,
+    sheltering,
+  ]);
 
   return (
     <section
@@ -155,8 +183,7 @@ export function PhaserPlay({
       <div className="phaser-play__canvas" ref={hostRef} />
       {visible ? (
         <p className="phaser-play__hint">
-          Move with arrows · click buildings · <strong>Plan day</strong> for
-          trade-offs
+          Arrows / WASD or tap to walk · stand still on a circle · bed ends the day
         </p>
       ) : null}
     </section>

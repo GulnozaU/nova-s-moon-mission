@@ -1,8 +1,10 @@
 import Phaser from "phaser";
+import { audio } from "../../audio/audio";
 import { bridge } from "../bridge";
 import { plainTalk } from "../../content/banned";
 import { nasaImageForContext } from "../../content/imageForContext";
 import { THEME } from "../theme";
+import { shelterDoorClose, stormImpactFx } from "../anim";
 
 /** Soft 2D A/B trade-off popup with matching NASA still. */
 export class ChoiceModal {
@@ -69,6 +71,23 @@ export class ChoiceModal {
 
     this.confirmBtn = this.actionBtn(0, 155, "Do this!", () => {
       if (!this.picked) return;
+      const event = bridge().getEvent();
+      const opt = this.picked === "A" ? event?.optionA : event?.optionB;
+      const isStorm = event?.stormSeverity !== undefined;
+      if (isStorm) {
+        audio.play("stormHit");
+        stormImpactFx(this.scene);
+        if (opt?.effects.sheltered) {
+          audio.play("shelterClose");
+          shelterDoorClose(
+            this.scene,
+            this.scene.scale.width * 0.2,
+            this.scene.scale.height * 0.48,
+          );
+        }
+      } else {
+        audio.play("success");
+      }
       bridge().choose(this.picked);
       this.hide();
     }, THEME.good);
@@ -119,10 +138,14 @@ export class ChoiceModal {
         fontStyle: "bold",
       })
       .setOrigin(0.5);
-    bg.on("pointerover", () => bg.setScale(1.04));
+    bg.on("pointerover", () => {
+      bg.setScale(1.04);
+      audio.play("uiHover");
+    });
     bg.on("pointerout", () => bg.setScale(1));
     bg.on("pointerdown", () => {
       bg.setScale(0.96);
+      audio.play("uiClick");
       if (!bridge().ready()) return;
       fn();
     });
@@ -132,6 +155,7 @@ export class ChoiceModal {
 
   private pick(which: "A" | "B") {
     this.picked = which;
+    audio.play("uiClick");
     const bgA = this.btnA.getData("bg") as Phaser.GameObjects.Rectangle;
     const bgB = this.btnB.getData("bg") as Phaser.GameObjects.Rectangle;
     bgA.setStrokeStyle(3, which === "A" ? THEME.accent : THEME.line, which === "A" ? 1 : 0.15);
@@ -143,6 +167,7 @@ export class ChoiceModal {
     this.open = true;
     this.picked = null;
     this.confirmBtn.setAlpha(0.45);
+    audio.play("uiClick");
     const event = bridge().getEvent();
     if (!event) {
       this.hide();

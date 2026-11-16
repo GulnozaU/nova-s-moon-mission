@@ -2,9 +2,9 @@ import type { DayDecisions } from "../engine/types";
 import type { Event, GameState, SourceBadge } from "../types";
 import type { StormAlert } from "../content/schedule";
 
-export type PlayMode = "explore" | "power" | "choose" | "result";
+export type PlayMode = "explore" | "power" | "choose" | "result" | "ending";
 
-/** Shown on the in-world consequence card (no scrolling DayResult page). */
+/** Shown briefly after end-day (floating numbers / Nova line). */
 export type BridgeDelta = {
   key: string;
   label: string;
@@ -26,11 +26,23 @@ export type MoonBridge = {
   getDeltas: () => BridgeDelta[];
   getStormAlerts: () => StormAlert[];
   getTomorrowHint: () => string;
+  /** Radio was ON at the end of the previous day. */
+  getCommsYesterday: () => boolean;
+  getNovaLine: () => string;
   ready: () => boolean;
   patchDecisions: (patch: Partial<DayDecisions>) => void;
   setDecisions: (d: DayDecisions) => void;
+  setNovaLine: (line: string) => void;
+  /** Shelter stance for today's storm (dwell on shelter circle). */
+  setSheltering: (on: boolean) => void;
+  getSheltering: () => boolean;
+  /** Apply the day and advance (choice from shelter flag on storm days). Returns deltas for floaters. */
+  endDay: () => BridgeDelta[];
+  /** @deprecated modal flow removed */
   goPowerCheck: () => void;
+  /** @deprecated modal flow removed */
   goChoice: () => void;
+  /** @deprecated modal flow removed */
   choose: (c: "A" | "B") => void;
   continueAfterResult: () => void;
   openGlossary: () => void;
@@ -76,9 +88,15 @@ function stubBridge(): MoonBridge {
     getDeltas: () => [],
     getStormAlerts: () => [],
     getTomorrowHint: () => "",
+    getCommsYesterday: () => false,
+    getNovaLine: () => "",
     ready: () => false,
     patchDecisions: () => undefined,
     setDecisions: () => undefined,
+    setNovaLine: () => undefined,
+    setSheltering: () => undefined,
+    getSheltering: () => false,
+    endDay: () => [],
     goPowerCheck: () => undefined,
     goChoice: () => undefined,
     choose: () => undefined,

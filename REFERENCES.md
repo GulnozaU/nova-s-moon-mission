@@ -23,6 +23,11 @@ No NASA API keys are embedded in the client. Live calls go through same-origin `
 | Vitest | Engine, data, content tests |
 | TypeScript | Types throughout |
 | oxlint | Lint |
+| Web Audio API | Procedural SFX + ambient pad (`src/audio/audio.ts`) |
+
+## Sound
+
+**Sounds are made in code** — oscillators and filtered noise in `src/audio/audio.ts`. No downloaded audio files. Audio unlocks after the first click on “Got it” / Start mission; master volume defaults to 0.5; mute is saved in `localStorage` (`nova-mute`).
 
 ## NASA stills (Image and Video Library)
 

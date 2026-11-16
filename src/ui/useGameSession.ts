@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { audio } from "../audio/audio";
 import {
   applyDay,
   availablePower,
@@ -17,6 +18,7 @@ import {
   type StormAlert,
 } from "../content/schedule";
 import type { Event, GameState, SiteId, SourceBadge } from "../types";
+import { novaTrimSpeech, trimDecisionsToBudget } from "../game/trimBudget";
 import { defaultDecisions } from "./powerMath";
 
 export type Phase =
@@ -63,17 +65,24 @@ export type GameSession = {
   generationToday: number;
   stormAlerts: StormAlert[];
   tomorrowHint: string;
+  commsYesterday: boolean;
+  novaLine: string;
+  sheltering: boolean;
   setPhase: (p: Phase) => void;
   setTrainingStep: (n: number) => void;
   setDecisions: (d: DayDecisions | ((prev: DayDecisions) => DayDecisions)) => void;
   setGlossaryOpen: (v: boolean) => void;
   setAfterStormOpen: (v: boolean) => void;
+  setNovaLine: (line: string) => void;
+  setSheltering: (on: boolean) => void;
   startTraining: () => void;
   pickSite: (site: SiteId) => Promise<void>;
   retryLoad: () => Promise<void>;
+  /** @deprecated dwell-circle loop — kept for bridge stubs */
   goPower: () => void;
   goEvent: () => void;
   chooseEvent: (choice: "A" | "B") => void;
+  endDayFromWorld: () => ResourceDelta[];
   continueAfterResult: () => void;
   replay: () => void;
   openLegend: () => void;
@@ -226,6 +235,12 @@ export function useGameSession(): GameSession {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [afterStormOpen, setAfterStormOpen] = useState(false);
   const [legendReturn, setLegendReturn] = useState<Phase>("welcome");
+  const [commsYesterday, setCommsYesterday] = useState(false);
+  const [novaLine, setNovaLine] = useState(
+    "Stand on a glowing circle to turn a machine on. Bed ends the day.",
+  );
+  const [sheltering, setSheltering] = useState(false);
+  const endingLock = useRef(false);
 
   const powerToday = useMemo(() => {
     if (!state) return 0;
@@ -242,11 +257,11 @@ export function useGameSession(): GameSession {
     return baseGeneration(state.site, state.day) + state.panelBonus;
   }, [state]);
 
-  /** Alerts use today's Comms decision + full CME warning days. */
+  /** Warning only if the radio was on yesterday. */
   const stormAlerts = useMemo(() => {
     if (!schedule || !state) return [];
-    return stormAlertsForDay(schedule, state.day, decisions.comms);
-  }, [schedule, state, decisions.comms]);
+    return stormAlertsForDay(schedule, state.day, commsYesterday);
+  }, [schedule, state, commsYesterday]);
 
   const tomorrowHint = useMemo(() => {
     if (!state) return "";
@@ -296,13 +311,24 @@ export function useGameSession(): GameSession {
       setState(created.state);
       setRng(() => created.rng);
       setTodaysEvent(dayEvent);
-      setDecisions(defaultDecisions());
+      const power = availablePower(
+        created.state.site,
+        created.state.day,
+        created.state.panelBonus,
+        created.state.battery,
+      );
+      const trimmed = trimDecisionsToBudget(defaultDecisions(), power);
+      setDecisions(trimmed.decisions);
+      setNovaLine(novaTrimSpeech(trimmed.turnedOff));
+      setCommsYesterday(false);
+      setSheltering(false);
       setLastResult(null);
       setLastChoice(null);
       setLastDecisions(null);
       setDeltas([]);
-      // Start on power trade-off — teaching choices is the core loop.
-      setPhase("power");
+      endingLock.current = false;
+      // Walk-the-base day loop (no Plan-day popup).
+      setPhase("base");
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Could not load NASA data.",
@@ -331,8 +357,77 @@ export function useGameSession(): GameSession {
     await bootstrapMission(site, seed);
   }, [bootstrapMission, site, seed]);
 
-  const goPower = useCallback(() => setPhase("power"), []);
-  const goEvent = useCallback(() => setPhase("event"), []);
+  const goPower = useCallback(() => setPhase("base"), []);
+  const goEvent = useCallback(() => setPhase("base"), []);
+
+  const advanceFromResult = useCallback(
+    (result: ApplyDayResult, usedDecisions: DayDecisions) => {
+      if (!schedule) return;
+      setCommsYesterday(Boolean(usedDecisions.comms));
+      if (result.lost || result.survived) {
+        if (result.won) audio.play("missionSuccess");
+        else if (result.lost) audio.play("missionFail");
+        else audio.play("dayEnd");
+        setPhase("end");
+        endingLock.current = false;
+        return;
+      }
+      const stormSlot = schedule.days.find((d) => d.day === result.dayLog.day);
+      if (
+        stormSlot?.afterStormCard &&
+        result.dayLog.eventId.startsWith("solar-storm")
+      ) {
+        setAfterStormOpen(true);
+      }
+      const nextDay = result.state.day;
+      const nextEvent =
+        schedule.days.find((d) => d.day === nextDay)?.event ?? null;
+      setTodaysEvent(nextEvent);
+      const power = availablePower(
+        result.state.site,
+        result.state.day,
+        result.state.panelBonus,
+        result.state.battery,
+      );
+      // Carry plan forward, then shut off what we cannot afford.
+      const trimmed = trimDecisionsToBudget(usedDecisions, power);
+      setDecisions(trimmed.decisions);
+      setNovaLine(novaTrimSpeech(trimmed.turnedOff));
+      setSheltering(false);
+      setLastResult(null);
+      setLastChoice(null);
+      setLastDecisions(null);
+      setDeltas([]);
+      endingLock.current = false;
+      setPhase("base");
+    },
+    [schedule],
+  );
+
+  /** End day from bed circle: shelter flag picks storm A/B; other days prefer A. */
+  const endDayFromWorld = useCallback((): ResourceDelta[] => {
+    if (!state || !todaysEvent || !rng || endingLock.current) return [];
+    endingLock.current = true;
+    const before = state;
+    const isStorm = todaysEvent.stormSeverity !== undefined;
+    let pick: "A" | "B" = isStorm ? (sheltering ? "A" : "B") : "A";
+    if (!isStorm && decisions.scienceLevel > 0) {
+      const aWipe = todaysEvent.optionA.effects.scienceThatDay === 0;
+      const bWipe = todaysEvent.optionB.effects.scienceThatDay === 0;
+      if (aWipe && !bWipe) pick = "B";
+    }
+    const result = applyDay(state, decisions, todaysEvent, pick, rng);
+    const nextDeltas = buildDeltas(before, result);
+    setLastDecisions({ ...decisions });
+    setLastChoice(pick);
+    setLastResult(result);
+    setDeltas(nextDeltas);
+    setState(result.state);
+    window.setTimeout(() => {
+      advanceFromResult(result, decisions);
+    }, 1600);
+    return nextDeltas;
+  }, [state, todaysEvent, rng, sheltering, decisions, advanceFromResult]);
 
   const chooseEvent = useCallback(
     (choice: "A" | "B") => {
@@ -344,37 +439,15 @@ export function useGameSession(): GameSession {
       setLastResult(result);
       setDeltas(buildDeltas(before, result));
       setState(result.state);
-      setPhase("result");
+      advanceFromResult(result, decisions);
     },
-    [state, todaysEvent, decisions, rng],
+    [state, todaysEvent, decisions, rng, advanceFromResult],
   );
 
   const continueAfterResult = useCallback(() => {
-    if (!lastResult || !schedule) return;
-    if (lastResult.lost || lastResult.survived) {
-      setPhase("end");
-      return;
-    }
-    const stormSlot = schedule.days.find(
-      (d) => d.day === lastResult.dayLog.day,
-    );
-    if (
-      stormSlot?.afterStormCard &&
-      lastResult.dayLog.eventId.startsWith("solar-storm")
-    ) {
-      setAfterStormOpen(true);
-    }
-    const nextDay = lastResult.state.day;
-    const nextEvent =
-      schedule.days.find((d) => d.day === nextDay)?.event ?? null;
-    setTodaysEvent(nextEvent);
-    setDecisions(defaultDecisions());
-    setLastResult(null);
-    setLastChoice(null);
-    setLastDecisions(null);
-    setDeltas([]);
-    setPhase("power");
-  }, [lastResult, schedule]);
+    if (!lastResult) return;
+    advanceFromResult(lastResult, lastDecisions ?? decisions);
+  }, [lastResult, lastDecisions, decisions, advanceFromResult]);
 
   const replay = useCallback(() => {
     const s =
@@ -395,6 +468,10 @@ export function useGameSession(): GameSession {
     setDeltas([]);
     setLoadError(null);
     setAfterStormOpen(false);
+    setCommsYesterday(false);
+    setSheltering(false);
+    setNovaLine("Stand on a glowing circle to turn a machine on. Bed ends the day.");
+    endingLock.current = false;
     setPhase("site");
   }, []);
 
@@ -429,17 +506,23 @@ export function useGameSession(): GameSession {
     generationToday,
     stormAlerts,
     tomorrowHint,
+    commsYesterday,
+    novaLine,
+    sheltering,
     setPhase,
     setTrainingStep,
     setDecisions,
     setGlossaryOpen,
     setAfterStormOpen,
+    setNovaLine,
+    setSheltering,
     startTraining,
     pickSite,
     retryLoad,
     goPower,
     goEvent,
     chooseEvent,
+    endDayFromWorld,
     continueAfterResult,
     replay,
     openLegend,

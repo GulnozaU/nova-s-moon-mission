@@ -93,6 +93,28 @@
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+.mute-btn {
+  min-width: 4.5rem;
+  font-weight: 700;
+}
+.mute-btn.is-muted {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+.dialogue__cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--peach, #e2b48a);
+  animation: blink 0.8s step-end infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialogue__cursor { animation: none; }
+  .brand img { animation: none; }
 }
 .brand {
   display: inline-flex;

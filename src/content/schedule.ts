@@ -239,21 +239,20 @@ export function scheduleMissionEvents(
 
 /**
  * Storm-coming alerts for today.
- * Comms ON: show if stormDay - day <= warningDays.
- * Comms OFF: show only if <= floor(warningDays / 2).
+ * Radio must have been on (caller passes yesterday's Comms) or no warning appears.
+ * When radio was on: show if stormDay - day <= warningDays.
  */
 export function stormAlertsForDay(
   schedule: MissionSchedule,
   day: number,
   commsOn: boolean,
 ): StormAlert[] {
+  if (!commsOn) return [];
   const alerts: StormAlert[] = [];
   for (const storm of schedule.storms) {
     const daysUntil = storm.day - day;
     if (daysUntil <= 0) continue;
-    const threshold = commsOn
-      ? storm.warningDays
-      : Math.floor(storm.warningDays / 2);
+    const threshold = storm.warningDays;
     if (daysUntil > threshold) continue;
     const n = daysUntil;
     alerts.push({

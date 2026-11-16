@@ -1,6 +1,8 @@
+import { audio } from "../audio/audio";
 import { CardNasaImage } from "./CardNasaImage";
 import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
+import { MuteButton } from "./MuteButton";
 import { PhaserPlay } from "../game/PhaserPlay";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
@@ -45,21 +47,10 @@ const TRAINING = [
 
 export function GameApp() {
   const g = useGameSession();
-  const dashMode: PlayMode =
-    g.phase === "power"
-      ? "power"
-      : g.phase === "event"
-        ? "choose"
-        : g.phase === "result"
-          ? "result"
-          : "explore";
+  const dashMode: PlayMode = g.phase === "end" ? "ending" : "explore";
   /** Keep one Phaser instance from Day 1 through the end report. */
   const missionLive = Boolean(g.state && g.weather && g.phase !== "welcome");
-  const playVisible =
-    g.phase === "base" ||
-    g.phase === "power" ||
-    g.phase === "event" ||
-    g.phase === "result";
+  const playVisible = g.phase === "base";
 
   const advanceTraining = () => {
     if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
@@ -72,17 +63,42 @@ export function GameApp() {
         Skip to game
       </a>
       <header className="nova-top">
-        <button type="button" className="brand" onClick={() => g.setPhase("welcome")}>
+        <button
+          type="button"
+          className="brand"
+          onClick={() => {
+            audio.play("uiClick");
+            g.setPhase("welcome");
+          }}
+          onMouseEnter={() => audio.play("uiHover")}
+        >
           <img src={ART.nova} alt="" />
           <span>Nova&apos;s Moon Mission</span>
         </button>
         <nav>
-          <button type="button" className="btn ghost" onClick={() => g.setGlossaryOpen(true)}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => {
+              audio.play("uiClick");
+              g.setGlossaryOpen(true);
+            }}
+            onMouseEnter={() => audio.play("uiHover")}
+          >
             Space words
           </button>
-          <button type="button" className="btn ghost" onClick={g.openLegend}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => {
+              audio.play("uiClick");
+              g.openLegend();
+            }}
+            onMouseEnter={() => audio.play("uiHover")}
+          >
             About the data
           </button>
+          <MuteButton />
         </nav>
       </header>
 
@@ -107,7 +123,12 @@ export function GameApp() {
                   { text: "Hello! I am Nova." },
                   { text: "Help me run this Moon base. Every choice helps — and costs." },
                 ]}
-                onDone={g.startTraining}
+                onDone={() => {
+                  // First gesture unlocks Web Audio (browsers require a click).
+                  audio.unlock();
+                  audio.play("dayStart");
+                  g.startTraining();
+                }}
               />
             </div>
           </section>
@@ -164,7 +185,12 @@ export function GameApp() {
                     key={site.id}
                     type="button"
                     className="site-card"
-                    onClick={() => void g.pickSite(site.id as "rim" | "plain")}
+                    onClick={() => {
+                      audio.unlock();
+                      audio.play("uiClick");
+                      void g.pickSite(site.id as "rim" | "plain");
+                    }}
+                    onMouseEnter={() => audio.play("uiHover")}
                   >
                     <CardNasaImage slot={slot} />
                     <h3>{site.name}</h3>
@@ -237,12 +263,14 @@ export function GameApp() {
             deltas={g.deltas}
             stormAlerts={g.stormAlerts}
             tomorrowHint={g.tomorrowHint}
+            commsYesterday={g.commsYesterday}
+            novaLine={g.novaLine}
+            sheltering={g.sheltering}
             visible={playVisible}
             onDecisions={g.setDecisions}
-            onPlanPower={g.goPower}
-            onReadyForEvent={g.goEvent}
-            onChoose={g.chooseEvent}
-            onContinueAfterResult={g.continueAfterResult}
+            onNovaLine={g.setNovaLine}
+            onSheltering={g.setSheltering}
+            onEndDay={g.endDayFromWorld}
             onOpenGlossary={() => g.setGlossaryOpen(true)}
           />
         ) : null}
