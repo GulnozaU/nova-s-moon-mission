@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { audio } from "../audio/audio";
 import { CardNasaImage } from "./CardNasaImage";
 import { GlossaryDrawer } from "./GlossaryDrawer";
 import { LegendScreen } from "./LegendScreen";
 import { MuteButton } from "./MuteButton";
 import { PhaserPlay } from "../game/PhaserPlay";
+import { WorldPlay } from "../world3d/WorldPlay";
 import { SourceBadge } from "./SourceBadge";
 import { ART } from "./art";
 import { getNasaImage } from "../content/images";
@@ -13,6 +15,12 @@ import { EndReport } from "./teach/EndReport";
 import { SpaceText } from "./teach/SpaceText";
 import type { PlayMode } from "../game/bridge";
 import "./game.css";
+
+/** Default = 3D world. `?mode=2d` launches the Phaser game (branch main-2d snapshot). */
+function playMode2d(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("mode") === "2d";
+}
 
 /** One idea per screen — Nova says it; no duplicate body text. */
 const TRAINING = [
@@ -48,9 +56,10 @@ const TRAINING = [
 export function GameApp() {
   const g = useGameSession();
   const dashMode: PlayMode = g.phase === "end" ? "ending" : "explore";
-  /** Keep one Phaser instance from Day 1 through the end report. */
+  /** Keep one play instance from Day 1 through the end report. */
   const missionLive = Boolean(g.state && g.weather && g.phase !== "welcome");
   const playVisible = g.phase === "base";
+  const use2d = useMemo(() => playMode2d(), []);
 
   const advanceTraining = () => {
     if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
@@ -253,28 +262,53 @@ export function GameApp() {
         ) : null}
 
         {missionLive && g.state && g.weather ? (
-          <PhaserPlay
-            state={g.state}
-            weather={g.weather}
-            event={g.todaysEvent}
-            decisions={g.decisions}
-            powerToday={g.powerToday}
-            mode={dashMode}
-            deltas={g.deltas}
-            stormAlerts={g.stormAlerts}
-            tomorrowHint={g.tomorrowHint}
-            commsYesterday={g.commsYesterday}
-            novaLine={g.novaLine}
-            sheltering={g.sheltering}
-            osdrStudy={g.greenhouseStudy}
-            visible={playVisible}
-            onDecisions={g.setDecisions}
-            onNovaLine={g.setNovaLine}
-            onSheltering={g.setSheltering}
-            onEndDay={g.endDayFromWorld}
-            onContinueAfterResult={g.continueAfterResult}
-            onOpenGlossary={() => g.setGlossaryOpen(true)}
-          />
+          use2d ? (
+            <PhaserPlay
+              state={g.state}
+              weather={g.weather}
+              event={g.todaysEvent}
+              decisions={g.decisions}
+              powerToday={g.powerToday}
+              mode={dashMode}
+              deltas={g.deltas}
+              stormAlerts={g.stormAlerts}
+              tomorrowHint={g.tomorrowHint}
+              commsYesterday={g.commsYesterday}
+              novaLine={g.novaLine}
+              sheltering={g.sheltering}
+              osdrStudy={g.greenhouseStudy}
+              visible={playVisible}
+              onDecisions={g.setDecisions}
+              onNovaLine={g.setNovaLine}
+              onSheltering={g.setSheltering}
+              onEndDay={g.endDayFromWorld}
+              onContinueAfterResult={g.continueAfterResult}
+              onOpenGlossary={() => g.setGlossaryOpen(true)}
+            />
+          ) : (
+            <WorldPlay
+              state={g.state}
+              weather={g.weather}
+              event={g.todaysEvent}
+              decisions={g.decisions}
+              powerToday={g.powerToday}
+              mode={dashMode}
+              deltas={g.deltas}
+              stormAlerts={g.stormAlerts}
+              tomorrowHint={g.tomorrowHint}
+              commsYesterday={g.commsYesterday}
+              novaLine={g.novaLine}
+              sheltering={g.sheltering}
+              osdrStudy={g.greenhouseStudy}
+              visible={playVisible}
+              onDecisions={g.setDecisions}
+              onNovaLine={g.setNovaLine}
+              onSheltering={g.setSheltering}
+              onEndDay={g.endDayFromWorld}
+              onContinueAfterResult={g.continueAfterResult}
+              onOpenGlossary={() => g.setGlossaryOpen(true)}
+            />
+          )
         ) : null}
 
         {g.phase === "end" && g.state ? (

@@ -1,0 +1,140 @@
+.world3d-root {
+  position: relative;
+  width: 100%;
+  height: min(70vh, 640px);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1410;
+  touch-action: none;
+}
+
+.world3d-root--fullscreen {
+  height: min(78vh, 720px);
+}
+
+.world3d-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.world3d-fade {
+  position: absolute;
+  inset: 0;
+  background: #1a1410;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 5;
+}
+
+.world3d-fade.is-on {
+  opacity: 1;
+}
+
+.world3d-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  font-family: "Nunito", system-ui, sans-serif;
+  color: #3a3348;
+}
+
+.world3d-hud > * {
+  pointer-events: auto;
+}
+
+.world3d-chips {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #fff8ef;
+  border: 2px solid rgba(58, 51, 72, 0.2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 200px;
+  max-width: min(420px, 92vw);
+}
+
+.world3d-chips__title {
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.world3d-chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.world3d-chip {
+  width: 14px;
+  height: 22px;
+  border-radius: 3px;
+  background: #6a6570;
+  opacity: 0.4;
+}
+
+.world3d-chip.is-free {
+  background: #e8c96a;
+  opacity: 1;
+}
+
+.world3d-chips__meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.world3d-places {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.world3d-places button {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(58, 51, 72, 0.25);
+  background: #fff8ef;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 14px;
+  color: #3a3348;
+  cursor: pointer;
+}
+
+.world3d-places button.is-here {
+  background: #e8c96a;
+}
+
+.world3d-nova {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(520px, 92vw);
+  background: #fff8ef;
+  border: 2px solid rgba(58, 51, 72, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.world3d-hint {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  font-size: 11px;
+  background: rgba(255, 248, 239, 0.9);
+  padding: 6px 8px;
+  border-radius: 8px;
+  max-width: 40%;
+}

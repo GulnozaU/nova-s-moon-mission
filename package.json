@@ -13,9 +13,13 @@
     "find-images": "npx --yes tsx scripts/find-images.ts"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@types/three": "^0.187.0",
     "phaser": "^3.80.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

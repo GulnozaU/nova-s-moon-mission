@@ -17,13 +17,22 @@ No NASA API keys are embedded in the client. Live calls go through same-origin `
 
 | Library | Role |
 |---------|------|
-| React 19 | Shell UI (welcome, training, site, end, legend) |
+| React 19 | Shell UI (welcome, training, site, end, legend) + DOM HUD overlays |
 | Vite | Build / dev server |
-| Phaser 3 | Persistent in-world day loop |
+| three + @react-three/fiber + @react-three/drei | Default 3D day loop (`src/world3d/`) |
+| Phaser 3 | Legacy 2D day loop (`?mode=2d`); preserved on git branch `main-2d` |
 | Vitest | Engine, data, content tests |
 | TypeScript | Types throughout |
 | oxlint | Lint |
-| Web Audio API | Procedural SFX + ambient pad (`src/audio/audio.ts`) |
+| Web Audio API | Procedural SFX (`src/audio/audio.ts`) |
+
+## 3D characters and art
+
+| Asset | License | Notes |
+|-------|---------|-------|
+| Nova + crew (Sam, Mira, Dr. Ana) | Original (this project) | Built from Three.js primitives (capsules/boxes/spheres). No third-party mesh pack. |
+| Moon surface / interiors | Original (this project) | Low-poly pastel blocks; MeshToonMaterial; no AI-image textures |
+| NASA stills | NASA media (see table below) | DOM / teaching UI only — not used as 3D textures |
 
 ## Sound
 
