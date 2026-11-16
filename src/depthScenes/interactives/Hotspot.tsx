@@ -109,6 +109,17 @@ export function Hotspot({
     } else {
       group.current.position.set(pos.x, y + bob, pos.z);
     }
+    // Radio dish idle rotation when powered
+    if (def.id === "surface_radio" && decisions.comms && !reduce) {
+      group.current.rotation.y = Math.sin(t * 0.7) * 0.35;
+    } else {
+      group.current.rotation.y = 0;
+    }
+    // Plant growth scale by stage
+    if (trayIdx >= 0) {
+      const grow = 0.85 + trayStage * 0.12;
+      group.current.scale.setScalar(grow);
+    }
     if (outline.current) {
       // Hit-test highlight while dragging: green accept / red reject
       const show =

@@ -338,3 +338,169 @@
   padding: 1px 5px;
   border: 1px solid rgba(58, 51, 72, 0.2);
 }
+
+.depth-storm-banner {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-family: "Baloo 2", Nunito, sans-serif;
+  font-size: 15px;
+  color: #fff8ef;
+  text-align: center;
+  pointer-events: none;
+  max-width: min(420px, 92vw);
+  animation: depth-storm-in 0.45s ease-out;
+}
+
+.depth-storm-banner p {
+  margin: 0;
+}
+
+.depth-storm-banner.is-warn {
+  background: #c98b7b;
+}
+
+.depth-storm-banner.is-storm {
+  background: #6a3a48;
+  box-shadow: 0 0 24px rgba(232, 201, 106, 0.35);
+}
+
+.depth-storm-banner.is-shake {
+  animation: depth-storm-shake 0.4s ease-in-out;
+}
+
+.depth-storm-flash {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 248, 239, 0.35);
+  pointer-events: none;
+  z-index: 11;
+  animation: depth-flash 0.4s ease-out;
+}
+
+@keyframes depth-storm-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes depth-storm-shake {
+  0%,
+  100% {
+    transform: translateX(-50%);
+  }
+  25% {
+    transform: translateX(calc(-50% - 4px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 4px));
+  }
+}
+
+@keyframes depth-flash {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .depth-storm-banner.is-shake,
+  .depth-storm-flash,
+  .depth-storm-banner {
+    animation: none;
+  }
+}
+
+/* Layout breakpoints: 1280×720, 1024×768, 390×844 */
+@media (max-width: 1280px) {
+  .world3d-root--fullscreen {
+    height: min(72vh, 680px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .world3d-root--fullscreen {
+    height: min(68vh, 620px);
+  }
+  .world3d-chips {
+    max-width: min(360px, 88vw);
+    font-size: 12px;
+  }
+  .world3d-places button {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .depth-tools {
+    max-width: 88vw;
+  }
+  .depth-briefing {
+    top: 38%;
+    width: min(440px, 94vw);
+  }
+}
+
+@media (max-width: 430px) {
+  .world3d-root--fullscreen {
+    height: min(58vh, 520px);
+  }
+  .world3d-chips {
+    left: 6px;
+    top: 6px;
+    padding: 6px 8px;
+    min-width: 0;
+    max-width: calc(100vw - 72px);
+  }
+  .world3d-places {
+    top: 6px;
+    right: 6px;
+    gap: 4px;
+  }
+  .world3d-places button {
+    min-width: 44px;
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .world3d-nova {
+    bottom: 8px;
+    width: min(100% - 16px, 92vw);
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+  .world3d-hint {
+    display: none;
+  }
+  .depth-tools {
+    bottom: 72px;
+    left: 6px;
+    gap: 6px;
+  }
+  .depth-tools button {
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .depth-storm-crew {
+    top: 100px;
+  }
+  .depth-briefing {
+    top: 45%;
+    padding: 12px;
+  }
+  .depth-consequence__title {
+    font-size: 14px;
+  }
+}

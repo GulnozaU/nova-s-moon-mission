@@ -77,6 +77,8 @@ class AudioEngine {
   private ducked = false;
   private hidden = false;
   private ambientNodes: { stop: () => void } | null = null;
+  /** Soft storm bed — only while a storm day is active. */
+  private stormLoop: { stop: () => void } | null = null;
   private recent: Map<SfxId, number[]> = new Map();
   private listeners = new Set<() => void>();
   private visibilityBound = false;
@@ -129,6 +131,7 @@ class AudioEngine {
       void this.ctx?.resume();
     }
     this.stopAmbient();
+    if (muted) this.stopStormLoop();
     this.emit();
   }
 
@@ -330,6 +333,7 @@ class AudioEngine {
       this.hidden = document.hidden;
       this.applyGains();
       if (document.hidden) {
+        this.stopStormLoop();
         void this.ctx?.suspend();
       } else if (this.unlocked && !this.muted) {
         void this.ctx?.resume();
@@ -346,6 +350,66 @@ class AudioEngine {
   private stopAmbient() {
     this.ambientNodes?.stop();
     this.ambientNodes = null;
+  }
+
+  /**
+   * Gentle storm bed (filtered noise + soft mid pulse). Call only on storm days.
+   * Stops automatically on mute / hide / stopStormLoop().
+   */
+  startStormLoop(): void {
+    if (!this.unlocked || this.muted || this.hidden) return;
+    if (this.stormLoop) return;
+    this.ensureCtx();
+    if (!this.ctx || !this.sfxBus) return;
+    const ctx = this.ctx;
+    const bus = this.sfxBus;
+    const t0 = ctx.currentTime;
+
+    const bufferSize = Math.floor(ctx.sampleRate * 2);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 420;
+    filter.Q.value = 0.6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.045, t0 + 1.2);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(bus);
+    src.start();
+
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.value = 180;
+    og.gain.value = 0.012;
+    o.connect(og);
+    og.connect(bus);
+    o.start();
+
+    this.stormLoop = {
+      stop: () => {
+        try {
+          src.stop();
+          o.stop();
+        } catch {
+          /* */
+        }
+        g.disconnect();
+        og.disconnect();
+      },
+    };
+  }
+
+  stopStormLoop(): void {
+    this.stormLoop?.stop();
+    this.stormLoop = null;
   }
 
   private blip(

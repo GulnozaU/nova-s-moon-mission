@@ -31,6 +31,8 @@ import { defaultPlaceFx, freePower } from "./interactives/actions";
 import type { CrewId, DragPayload, PlaceFx } from "./interactives/types";
 import { ConsequenceScene } from "./ConsequenceScene";
 import { MorningBriefing } from "./MorningBriefing";
+import { StormAnnounce } from "./StormAnnounce";
+import { PLAIN_LIT_DAYS } from "../engine/constants";
 import "../world3d/hud/WorldHud.css";
 import "./interactives/depthInteract.css";
 
@@ -76,11 +78,11 @@ function preferOsdr476(study: OsdrStudy | null): OsdrStudy | null {
 function stormBrief(event: Event | null, alerts: StormAlert[]): string {
   if (event?.stormSeverity !== undefined) {
     const date = event.eventDate?.slice(0, 10) ?? "NASA date";
-    return `Storm day · NASA saw this on ${date}. Shelter the crew.`;
+    return `Storm day. NASA saw this on ${date}. Shelter the crew.`;
   }
   if (alerts.length > 0) {
     const a = alerts[0]!;
-    return `${a.message} · warning ~${a.warningDays} day(s).`;
+    return `${a.message} About ${a.warningDays} day(s) of warning.`;
   }
   return "No storm warning yet. Chip the radio so Mission Control can call.";
 }
@@ -135,8 +137,24 @@ export function DepthWorldPlay(props: Props) {
   } | null>(null);
   const [consequence, setConsequence] = useState<BridgeDelta[] | null>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  const [stormPulse, setStormPulse] = useState(0);
   const endingRef = useRef(false);
   const stormToday = event?.stormSeverity !== undefined;
+  const warningComing = !stormToday && stormAlerts.length > 0 && commsYesterday;
+  const isNight =
+    state.site === "plain" && state.day > PLAIN_LIT_DAYS && !stormToday;
+
+  useEffect(() => {
+    if (!stormToday) {
+      setStormPulse(0);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setStormPulse(1);
+      window.setTimeout(() => setStormPulse(0), 400);
+    }, prefersReducedMotion() ? 9000 : 5200);
+    return () => window.clearInterval(id);
+  }, [stormToday]);
 
   const setFx = useCallback(
     (patch: Partial<PlaceFx> | ((p: PlaceFx) => PlaceFx)) => {
@@ -190,7 +208,7 @@ export function DepthWorldPlay(props: Props) {
       getState: () => state,
       getEvent: () => event,
       getHint: () =>
-        "Hover objects · drag chips/water/crates · walk up to USE · bed ends day",
+        "Hover objects. Drag chips onto jobs. Walk up to use. Bed ends the day.",
       getDeltas: () => deltas,
       getStormAlerts: () => stormAlerts,
       getTomorrowHint: () => tomorrowHint,
@@ -355,6 +373,9 @@ export function DepthWorldPlay(props: Props) {
             onReachedDoor={enterPlace}
             walkApiRef={walkApiRef}
             novaPosRef={novaPosRef}
+            isNight={isNight}
+            stormToday={stormToday}
+            stormPulse={stormPulse}
             interactives={
               <InteractiveLayer
                 place={place}
@@ -377,6 +398,12 @@ export function DepthWorldPlay(props: Props) {
           />
         </Suspense>
       </Canvas>
+
+      <StormAnnounce
+        stormToday={stormToday}
+        warningComing={warningComing}
+        daysUntil={stormAlerts[0]?.daysUntil}
+      />
 
       <div
         className={`world3d-fade${fadeOn ? " is-on" : ""}`}
@@ -571,8 +598,7 @@ export function DepthWorldPlay(props: Props) {
         {novaLine ? <p className="world3d-nova">{novaLine}</p> : null}
 
         <p className="world3d-hint">
-          Drag chips (green/red targets) · machines need full chips · bunk ends
-          day
+          Drag chips onto green targets. Fill machines fully. Bed ends the day.
         </p>
       </div>
 

@@ -36,6 +36,11 @@ export type DepthPlaceSceneProps = {
   /** Live Nova world position for USE-range checks. */
   novaPosRef: MutableRefObject<THREE.Vector3>;
   interactives?: ReactNode;
+  /** Plain-site night or storm dim. */
+  isNight?: boolean;
+  stormToday?: boolean;
+  /** Brief flash / shake from storm FX. */
+  stormPulse?: number;
 };
 
 function DepthPainting({
@@ -118,9 +123,11 @@ function EdgeClampBackdrop({
 function FollowParallaxCamera({
   pointer,
   follow,
+  stormPulse = 0,
 }: {
   pointer: { x: number; y: number };
   follow: THREE.Vector3;
+  stormPulse?: number;
 }) {
   const { camera } = useThree();
   useFrame(() => {
@@ -129,8 +136,12 @@ function FollowParallaxCamera({
     const tx = reduce ? 0 : pointer.x * max;
     const ty = reduce ? 0 : -pointer.y * max * 0.55;
     const sway = reduce ? 0 : Math.sin(performance.now() * 0.00045) * 0.04;
+    const shake =
+      !reduce && stormPulse > 0
+        ? Math.sin(performance.now() * 0.05) * 0.08 * Math.min(1, stormPulse)
+        : 0;
     const desired = new THREE.Vector3(
-      follow.x * 0.35 + Math.sin(tx) * 1.2 + sway,
+      follow.x * 0.35 + Math.sin(tx) * 1.2 + sway + shake,
       1.35 + Math.sin(ty) * 0.5,
       8.8 + follow.z * 0.08,
     );
@@ -143,18 +154,25 @@ function FollowParallaxCamera({
 function DoorMarker({
   position,
   label,
+  opening,
 }: {
   position: THREE.Vector3;
   label: string;
+  opening?: boolean;
 }) {
   const reduce = prefersReducedMotion();
   const pulse = useRef(0);
   const mesh = useRef<THREE.Mesh>(null);
+  const panel = useRef<THREE.Mesh>(null);
   useFrame((_, dt) => {
     pulse.current += dt;
     if (!mesh.current || reduce) return;
     const s = 1 + Math.sin(pulse.current * 3) * 0.08;
     mesh.current.scale.set(s, 1, s);
+    if (panel.current) {
+      const open = opening ? Math.min(1, pulse.current * 2) : 0.15;
+      panel.current.rotation.y = -open * 1.1;
+    }
   });
   return (
     <group position={[position.x, 0.02, position.z]}>
@@ -162,11 +180,10 @@ function DoorMarker({
         <ringGeometry args={[0.35, 0.55, 24]} />
         <meshBasicMaterial color="#e8c96a" transparent opacity={0.85} />
       </mesh>
-      <mesh position={[0, 0.9, 0]}>
+      <mesh ref={panel} position={[0.2, 0.9, 0]}>
         <planeGeometry args={[0.55, 1.1]} />
         <meshBasicMaterial color="#c9a227" transparent opacity={0.55} />
       </mesh>
-      {/* label kept in HUD; keep marker silent for a11y */}
       <group userData={{ doorLabel: label }} />
     </group>
   );
@@ -272,6 +289,9 @@ export function DepthPlaceScene({
   walkApiRef,
   novaPosRef,
   interactives,
+  isNight = false,
+  stormToday = false,
+  stormPulse = 0,
 }: DepthPlaceSceneProps) {
   const [w, d] = floor.worldSize;
   const aspectH = (w * floor.paintingSize[1]) / floor.paintingSize[0];
@@ -392,12 +412,31 @@ export function DepthPlaceScene({
 
   const novaScale =
     0.95 + Math.max(0, Math.min(1, pos.current.z / 5)) * 0.35;
+  const sky = stormToday
+    ? "#2a2430"
+    : isNight
+      ? "#1c2438"
+      : "#f3ebe0";
+  const amb = stormToday ? 0.55 : isNight ? 0.45 : 1;
 
   return (
     <>
-      <color attach="background" args={["#f3ebe0"]} />
-      <ambientLight intensity={1} />
-      <FollowParallaxCamera pointer={pointer} follow={pos.current} />
+      <color attach="background" args={[sky]} />
+      <ambientLight intensity={amb} />
+      {isNight || stormToday ? (
+        <directionalLight
+          intensity={stormToday ? 0.35 : 0.25}
+          position={[2, 4, 3]}
+          color={stormToday ? "#c9b8ff" : "#8fb4c9"}
+        />
+      ) : (
+        <directionalLight intensity={0.4} position={[1, 5, 2]} color="#fff4e0" />
+      )}
+      <FollowParallaxCamera
+        pointer={pointer}
+        follow={pos.current}
+        stormPulse={stormPulse}
+      />
       <EdgeClampBackdrop
         paintingUrl={floor.painting}
         worldW={w}
@@ -414,6 +453,7 @@ export function DepthPlaceScene({
           key={door.id}
           position={uvToWorld(door.uv, w, d)}
           label={door.label}
+          opening={fading || navigateTo === door.to}
         />
       ))}
       {(floor.billboards ?? []).map((b) =>

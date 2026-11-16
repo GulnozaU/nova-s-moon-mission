@@ -1592,3 +1592,28 @@ button.actor {
   .dash { display: flex; flex-direction: column; }
   .dash-ui { background: linear-gradient(180deg, transparent, rgba(243,235,224,0.55) 8%); }
 }
+
+/* Phone / 390×844 */
+@media (max-width: 430px) {
+  .nova-top {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .nova-top .brand span {
+    font-size: 0.95rem;
+  }
+  .nova-top nav .btn {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.8rem;
+  }
+  .welcome-copy h1 {
+    font-size: 1.45rem;
+  }
+  .site-grid {
+    grid-template-columns: 1fr;
+  }
+  .panel {
+    padding: 0.85rem;
+  }
+}

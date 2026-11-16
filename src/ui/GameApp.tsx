@@ -14,6 +14,7 @@ import { DialogueBox } from "./teach/DialogueBox";
 import { EndReport } from "./teach/EndReport";
 import { SpaceText } from "./teach/SpaceText";
 import type { PlayMode } from "../game/bridge";
+import { DemoDirector, isDemoMode } from "../demo/DemoDirector";
 import "./game.css";
 
 /** Default = depth-painting world. `?mode=2d` launches the Phaser game (branch main-2d). */
@@ -60,6 +61,7 @@ export function GameApp() {
   const missionLive = Boolean(g.state && g.weather && g.phase !== "welcome");
   const playVisible = g.phase === "base";
   const use2d = useMemo(() => playMode2d(), []);
+  const demo = useMemo(() => isDemoMode(), []);
 
   const advanceTraining = () => {
     if (g.trainingStep >= TRAINING.length - 1) g.setPhase("site");
@@ -67,7 +69,14 @@ export function GameApp() {
   };
 
   return (
-    <div className="nova-app">
+    <div className={`nova-app${demo ? " is-demo" : ""}`}>
+      <DemoDirector
+        enabled={demo}
+        phase={g.phase}
+        setPhase={g.setPhase}
+        pickSite={g.pickSite}
+        setNovaLine={g.setNovaLine}
+      />
       <a className="skip-link" href="#main">
         Skip to game
       </a>

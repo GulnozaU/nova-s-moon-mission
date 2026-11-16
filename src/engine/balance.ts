@@ -25,19 +25,28 @@ export type StrategyId =
   | "all_safety"
   | "balanced"
   | "greenhouse_heavy"
+  | "ignore_radio"
   | "random"
   | "smart";
 
-/** Fixed strategies only (no adaptive smart bot). */
-export const FIXED_STRATEGY_IDS: Exclude<StrategyId, "smart">[] = [
+/** Fixed strategies only (no adaptive smart bot). Used for ≤60% success band. */
+export const FIXED_STRATEGY_IDS: Exclude<StrategyId, "smart" | "ignore_radio">[] =
+  ["all_science", "all_safety", "balanced", "greenhouse_heavy", "random"];
+
+/** The five playstyles called out for QA / judging videos. */
+export const QA_STRATEGY_IDS: StrategyId[] = [
   "all_science",
   "all_safety",
   "balanced",
+  "ignore_radio",
   "greenhouse_heavy",
-  "random",
 ];
 
-export const STRATEGY_IDS: StrategyId[] = [...FIXED_STRATEGY_IDS, "smart"];
+export const STRATEGY_IDS: StrategyId[] = [
+  ...FIXED_STRATEGY_IDS,
+  "ignore_radio",
+  "smart",
+];
 
 export type BalanceRow = {
   strategy: StrategyId;
@@ -95,11 +104,31 @@ const strategies: Record<StrategyId, StrategyFn> = {
       comms: true,
       scienceLevel: 0,
       greenhouse: false,
+      buildShield: materials >= 2,
+      buildPanel: false,
+      cleanFilter: recyclerEfficiency < 1 && materials >= 1,
+      shelteredCrewCount: isStorm ? 3 : 0,
+    },
+    choice: isStorm ? "A" : "A",
+  }),
+
+  /**
+   * Never powers the radio — no storm warnings.
+   * Often stays out on storms (doesn't know) → higher exposure risk.
+   */
+  ignore_radio: ({ day, isStorm, materials, recyclerEfficiency }) => ({
+    decisions: {
+      recycler: true,
+      oxygenMaker: day % 2 === 0,
+      comms: false,
+      scienceLevel: isStorm ? 2 : 3,
+      greenhouse: false,
       buildShield: false,
       buildPanel: false,
       cleanFilter: recyclerEfficiency < 1 && materials >= 1,
+      shelteredCrewCount: 0,
     },
-    choice: isStorm ? "A" : "A",
+    choice: isStorm ? "B" : "A",
   }),
 
   // Mixed: science + one shield. Risks the early storm (not fully adaptive).
@@ -457,8 +486,9 @@ export function bestFixedStrategyForSite(
   rows: BalanceRow[],
   site: SiteId,
 ): StrategyId {
+  const fixed = new Set<string>(FIXED_STRATEGY_IDS);
   const siteRows = rows.filter(
-    (r) => r.site === site && r.strategy !== "smart",
+    (r) => r.site === site && fixed.has(r.strategy),
   );
   let best = siteRows[0]!;
   for (const row of siteRows) {
