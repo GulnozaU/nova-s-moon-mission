@@ -24,22 +24,22 @@
 .phaser-play__canvas {
   position: relative;
   width: 100%;
-  min-height: min(70vh, 560px);
-  background: #8aa4b8;
+  min-height: min(72vh, 600px);
+  background: #6a7a88;
   display: flex;
   align-items: center;
   justify-content: center;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+  /* Soft pixel — mild crispness, not harsh 8-bit */
+  image-rendering: auto;
 }
 
 .phaser-play__canvas canvas {
   display: block;
-  /* Slight pixel snap without harsh nearest-only look */
-  image-rendering: auto;
   max-width: 100%;
-  max-height: min(70vh, 560px);
-  border-radius: 2px;
+  max-height: min(72vh, 600px);
+  border-radius: 4px;
+  /* Gentle contrast so the hub painting reads like a playable stage */
+  filter: contrast(1.04) saturate(1.05);
 }
 
 .phaser-play__hint {

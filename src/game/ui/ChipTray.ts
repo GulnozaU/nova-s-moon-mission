@@ -11,12 +11,12 @@ import type { DragController } from "../drag/DragController";
 
 /**
  * Power chip tray — leftover chips are draggable onto jobs.
- * Heat is always reserved in plannedPowerCost. Unused chips carry to battery (cap).
+ * Uses zap art tiles (not bare rectangles) for a soft-pixel farm-sim feel.
  */
 export class ChipTray {
   private root: Phaser.GameObjects.Container;
   private title: Phaser.GameObjects.Text;
-  private cells: Phaser.GameObjects.Rectangle[] = [];
+  private cells: Phaser.GameObjects.Image[] = [];
   private cellHit: Phaser.GameObjects.Zone[] = [];
   private meta: Phaser.GameObjects.Text;
   private lastKey = "";
@@ -34,19 +34,37 @@ export class ChipTray {
       padding: { x: 6, y: 3 },
     });
     this.root.add(this.title);
+    if (
+      !scene.textures.exists("chip") &&
+      !scene.textures.exists("chipSoft") &&
+      !scene.textures.exists("zap")
+    ) {
+      const g = scene.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0xffe08a, 1);
+      g.fillRoundedRect(1, 1, 12, 16, 3);
+      g.lineStyle(1, 0x3a3348, 0.35);
+      g.strokeRoundedRect(1, 1, 12, 16, 3);
+      g.generateTexture("chipSoft", 14, 18);
+      g.destroy();
+    }
+    const chipKey = scene.textures.exists("chip")
+      ? "chip"
+      : scene.textures.exists("zap")
+        ? "zap"
+        : "chipSoft";
     for (let i = 0; i < 20; i++) {
-      const cx = 6 + i * 16;
-      const cy = 24;
+      const cx = 8 + i * 17;
+      const cy = 26;
       const cell = scene.add
-        .rectangle(cx, cy, 12, 18, 0x6a6570, 0.35)
-        .setStrokeStyle(1, THEME.line, 0.3)
-        .setVisible(false);
-      const zone = scene.add.zone(cx, cy, 14, 22);
+        .image(cx, cy, chipKey)
+        .setDisplaySize(chipKey === "chip" ? 16 : 14, chipKey === "chip" ? 16 : 18)
+        .setVisible(false)
+        .setTint(chipKey === "chip" ? 0xffffff : 0xffe08a);
+      const zone = scene.add.zone(cx, cy, 16, 22);
       zone.setInteractive({ useHandCursor: true });
       zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
         if (!this.drag || !bridge().ready()) return;
         const left = this.freeChips();
-        // Free chips are drawn in slots 0..left-1
         if (i >= left) return;
         p.event.stopPropagation();
         this.drag.begin(
@@ -108,10 +126,12 @@ export class ChipTray {
       }
       cell.setVisible(true);
       if (i < left) {
-        cell.setFillStyle(0xffe08a, 0.95);
+        cell.setTint(0xffe08a);
+        cell.setAlpha(1);
         zone.setInteractive({ useHandCursor: true });
       } else {
-        cell.setFillStyle(0x6a6570, 0.4);
+        cell.setTint(0x6a6570);
+        cell.setAlpha(0.45);
         zone.disableInteractive();
       }
     }

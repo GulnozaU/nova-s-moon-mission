@@ -116,7 +116,7 @@ export function GameApp() {
           <section className="screen welcome-screen">
             <div
               className="welcome-hero"
-              style={{ backgroundImage: `url(${ART.lunarSurface})` }}
+              style={{ backgroundImage: `url(${ART.moonBaseHub})` }}
             >
               <img
                 src={ART.nova}

@@ -22,14 +22,17 @@ import {
 import {
   addShadow,
   dustPuff,
+  ensureSoftPadTexture,
   fadeSlideIn,
   floatNumber,
   idleBreathe,
   oxygenBubbles,
-  setPlantStage,
+  plantSway,
+  pulseDoorGlow,
   sparkBurst,
   stormImpactFx,
   walkHop,
+  wheatFieldSway,
 } from "../anim";
 import { ChipTray } from "../ui/ChipTray";
 import { PlaceHud } from "../ui/PlaceHud";
@@ -67,7 +70,7 @@ export class IndoorScene extends Phaser.Scene {
   private walkTarget: { x: number; y: number } | null = null;
   private lastFootstep = 0;
   private novaBubble!: Phaser.GameObjects.Text;
-  private plantLeaves: Phaser.GameObjects.Ellipse[] = [];
+  private plantLeaves: Phaser.GameObjects.Image[] = [];
   private ending = false;
   private chipTray!: ChipTray;
   private crewTalk!: CrewTalk;
@@ -108,12 +111,17 @@ export class IndoorScene extends Phaser.Scene {
     const { width: W, height: H } = this.scale;
     fadeSlideIn(this, true);
     this.drag = new DragController(this);
+    ensureSoftPadTexture(this);
     const bgKey =
       this.room === "home" ? "bunks" : this.room === "greenhouse" ? "greenhouseIn" : "labIn";
-    this.cameras.main.setBackgroundColor(0x1a1410);
-    this.add.rectangle(0, 0, W, H, 0x2a2218).setOrigin(0).setDepth(0);
-    this.add.image(W / 2, H / 2, bgKey).setDisplaySize(W, H).setAlpha(0.34).setDepth(1);
-    this.add.rectangle(W / 2, H * 0.72, W, H * 0.45, 0x3a3228, 0.7).setDepth(2);
+    this.cameras.main.setBackgroundColor(0x2a2218);
+    // Soft-pixel room: painting carries the place; light grade only (no flat floor slab).
+    this.add.image(W / 2, H / 2, bgKey).setDisplaySize(W, H).setDepth(0);
+    this.add.rectangle(0, 0, W, H, 0xfff8ef, 0.08).setOrigin(0).setDepth(1);
+    this.add
+      .rectangle(0, H * 0.88, W, H * 0.12, 0x1a1410, 0.18)
+      .setOrigin(0)
+      .setDepth(2);
 
     this.add
       .text(W / 2, 8, roomTitle(this.room), {
@@ -143,16 +151,21 @@ export class IndoorScene extends Phaser.Scene {
     if (this.room === "greenhouse") this.buildGreenhouse(W, H);
     if (this.room === "lab") this.buildLab(W, H);
 
-    this.exitDoor = { x: W * 0.5, y: H * 0.88, r: 34 };
-    this.add
-      .rectangle(this.exitDoor.x, this.exitDoor.y, 70, 28, 0x5a4030, 0.95)
-      .setStrokeStyle(2, 0xffe08a, 0.85)
+    this.exitDoor = { x: W * 0.5, y: H * 0.9, r: 38 };
+    const exitGlow = this.add
+      .image(this.exitDoor.x, this.exitDoor.y, "softPad")
+      .setDisplaySize(96, 40)
+      .setTint(0xffe08a)
+      .setAlpha(0.6)
       .setDepth(12);
+    pulseDoorGlow(this, exitGlow);
     this.add
-      .text(this.exitDoor.x, this.exitDoor.y, "EXIT → surface", {
+      .text(this.exitDoor.x, this.exitDoor.y - 22, "← Surface", {
         fontFamily: THEME.fontDisplay,
-        fontSize: "11px",
-        color: THEME.cream,
+        fontSize: "12px",
+        color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 6, y: 2 },
       })
       .setOrigin(0.5)
       .setDepth(13);
@@ -253,6 +266,9 @@ export class IndoorScene extends Phaser.Scene {
         costs: [{ icon: "⚡", value: -HEAT_COST }],
         benefits: [{ icon: "🌡", value: "safe" }],
         accept: "chip",
+        artKey: "zap",
+        artW: 36,
+        artH: 36,
         getOn: () => true,
         onDrop: () => {
           this.say("Heat stays on every day (already paid).");
@@ -278,6 +294,9 @@ export class IndoorScene extends Phaser.Scene {
         ],
         accept: "chip",
         chipCost: RECYCLER_COST,
+        artKey: "waterCleaner",
+        artW: 56,
+        artH: 48,
         getOn: () => bridge().getDecisions().recycler,
         getFill: () => this.fills.recycler ?? 0,
         onDrop: (p) => {
@@ -309,6 +328,9 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "O₂", value: OXYGEN_MAKER_GAIN }],
         accept: "chip",
         chipCost: OXYGEN_MAKER_COST,
+        artKey: "airMaker",
+        artW: 52,
+        artH: 48,
         getOn: () => bridge().getDecisions().oxygenMaker,
         getFill: () => this.fills.air ?? 0,
         onDrop: (p) =>
@@ -326,6 +348,9 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "→", value: "night" }],
         accept: "nova",
         radius: 42,
+        artKey: "bunkMarker",
+        artW: 54,
+        artH: 36,
         getOn: () => false,
         onDrop: () => {
           this.finishDay();
@@ -336,20 +361,38 @@ export class IndoorScene extends Phaser.Scene {
   }
 
   private buildGreenhouse(W: number, H: number) {
-    for (let i = 0; i < 3; i++) {
-      const x = W * (0.32 + i * 0.14);
-      const y = H * 0.5;
-      const leaf = this.add.ellipse(x, y, 28, 34, 0x8a6a3a).setDepth(8);
-      this.add.rectangle(x, y + 20, 20, 12, 0x6b4a2a).setDepth(8);
+    // Drought-video wheat sway — staggered plant clusters over the beds.
+    const sway: Phaser.GameObjects.Image[] = [];
+    for (let i = 0; i < 5; i++) {
+      const x = W * (0.28 + i * 0.1);
+      const y = H * 0.58;
+      const key = i < 2 ? "plant1" : i < 4 ? "plant2" : "plant3";
+      const leaf = this.add
+        .image(x, y, key)
+        .setDisplaySize(36 + i * 4, 44 + i * 6)
+        .setDepth(8);
+      sway.push(leaf);
       this.plantLeaves.push(leaf);
     }
+    wheatFieldSway(this, sway);
+    // Extra soft sway on tray prop near drop zone
+    if (this.textures.exists("plantTray")) {
+      const tray = this.add
+        .image(W * 0.46, H * 0.52, "plantTray")
+        .setDisplaySize(70, 48)
+        .setDepth(7)
+        .setAlpha(0.85)
+        .setOrigin(0.5, 1);
+      plantSway(this, tray, 200);
+    }
 
-    // Tap — spawn water drops
-    const tap = this.add.container(W * 0.16, H * 0.48).setDepth(16);
-    const spout = this.add.rectangle(0, 0, 18, 28, 0x6a8a9a, 0.95).setStrokeStyle(2, THEME.line, 0.35);
-    const dropIcon = this.add.text(0, 18, "💧", { fontSize: "16px" }).setOrigin(0.5);
+    // Tap — art prop, drag water from here
+    const tap = this.add.container(W * 0.16, H * 0.5).setDepth(16);
+    const spout = this.add
+      .image(0, 0, this.textures.exists("bucketFull") ? "bucketFull" : "waterTap")
+      .setDisplaySize(40, 48);
     const tapLabel = this.add
-      .text(0, -28, "Tap", {
+      .text(0, -34, "Tap", {
         fontFamily: THEME.fontDisplay,
         fontSize: "11px",
         color: THEME.ink,
@@ -357,9 +400,9 @@ export class IndoorScene extends Phaser.Scene {
         padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5);
-    tap.add([spout, dropIcon, tapLabel]);
-    tap.setSize(40, 50);
-    tap.setInteractive(new Phaser.Geom.Rectangle(-20, -30, 40, 55), Phaser.Geom.Rectangle.Contains);
+    tap.add([spout, tapLabel]);
+    tap.setSize(48, 56);
+    tap.setInteractive(new Phaser.Geom.Rectangle(-24, -32, 48, 60), Phaser.Geom.Rectangle.Contains);
     tap.on("pointerdown", (p: Phaser.Input.Pointer) => {
       p.event.stopPropagation();
       this.drag.begin({ kind: "water", amount: GREENHOUSE_WATER }, p.worldX, p.worldY, 0x3a7ca5);
@@ -376,6 +419,9 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "🌱", value: "grow" }],
         accept: "water",
         radius: 48,
+        artKey: "plant2",
+        artW: 48,
+        artH: 40,
         getOn: () => this.plantsWatered,
         onDrop: () => {
           if (this.plantsWatered) {
@@ -387,7 +433,6 @@ export class IndoorScene extends Phaser.Scene {
           floatNumber(this, W * 0.46, H * 0.55, `💧−${GREENHOUSE_WATER}`, THEME.skyDeep);
           this.tryEnableGreenhouse(W, H);
           this.syncPlants();
-          // Greenhouse taught after Day 1 via morning talk.
           this.afterJob();
           return true;
         },
@@ -407,6 +452,9 @@ export class IndoorScene extends Phaser.Scene {
         ],
         accept: "chip",
         chipCost: GREENHOUSE_COST,
+        artKey: "growLight",
+        artW: 64,
+        artH: 28,
         getOn: () => this.growLightOn,
         onDrop: () => {
           if (!this.plantsWatered) {
@@ -472,28 +520,32 @@ export class IndoorScene extends Phaser.Scene {
         : "No warning — radio had no chips yesterday.",
     );
 
-    // OSDR clipboard
-    const clip = this.add.container(W * 0.78, H * 0.4).setDepth(56);
+    // OSDR clipboard — soft pad + label (painting carries the desk)
+    const clip = this.add.container(W * 0.78, H * 0.42).setDepth(56);
     const board = this.add
-      .rectangle(0, 0, 100, 120, 0xf3ebe0, 0.98)
-      .setStrokeStyle(2, THEME.line, 0.35);
+      .image(0, 0, "softPad")
+      .setDisplaySize(88, 56)
+      .setTint(0xf3ebe0)
+      .setAlpha(0.85);
     const clipTitle = this.add
-      .text(0, -48, "OSDR clipboard", {
+      .text(0, -8, "OSDR notes", {
         fontFamily: THEME.fontDisplay,
         fontSize: "11px",
         color: THEME.ink,
+        backgroundColor: THEME.cream,
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5);
     const clipHint = this.add
-      .text(0, 40, "tap to open", {
+      .text(0, 16, "tap", {
         fontFamily: THEME.font,
         fontSize: "10px",
         color: THEME.inkSoft,
       })
       .setOrigin(0.5);
     clip.add([board, clipTitle, clipHint]);
-    clip.setSize(100, 120);
-    clip.setInteractive(new Phaser.Geom.Rectangle(-50, -60, 100, 120), Phaser.Geom.Rectangle.Contains);
+    clip.setSize(100, 70);
+    clip.setInteractive(new Phaser.Geom.Rectangle(-50, -40, 100, 80), Phaser.Geom.Rectangle.Contains);
     clip.on("pointerdown", (p: Phaser.Input.Pointer) => {
       p.event.stopPropagation();
       this.openOsdrClipboard(W, H);
@@ -510,6 +562,9 @@ export class IndoorScene extends Phaser.Scene {
         benefits: [{ icon: "🔬", value: `+${sciPts}` }],
         accept: "chip",
         chipCost: 1,
+        artKey: this.textures.exists("terminal") ? "terminal" : "sampleAnalyzer",
+        artW: 56,
+        artH: 48,
         getOn: () => bridge().getDecisions().scienceLevel > 0,
         onDrop: () => {
           const d = bridge().getDecisions();
@@ -663,7 +718,12 @@ export class IndoorScene extends Phaser.Scene {
         : this.plantsWatered && this.growLightOn
           ? 3
           : 2;
-    for (const leaf of this.plantLeaves) setPlantStage(leaf, stage);
+    const key = (`plant${stage}` as "plant0" | "plant1" | "plant2" | "plant3");
+    for (const leaf of this.plantLeaves) {
+      if (this.textures.exists(key)) leaf.setTexture(key);
+      leaf.setDisplaySize(42 + stage * 2, 48 + stage * 3);
+      leaf.setAlpha(stage === 0 ? 0.75 : 1);
+    }
   }
 
   private say(msg: string) {

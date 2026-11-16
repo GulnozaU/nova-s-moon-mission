@@ -6,20 +6,21 @@ import { applyMovement, makeKeys, type ControlKeys } from "../playerControls";
 import {
   addShadow,
   dustPuff,
+  ensureSoftPadTexture,
   fadeSlideIn,
   floatNumber,
   idleBreathe,
-  oxygenBubbles,
-  paintMoonGround,
   panelGlow,
+  pulseDoorGlow,
   reduceMotion,
-  setPlantStage,
+  roverIdleBounce,
   shieldShimmer,
   sparkBurst,
   stormWarningPulse,
   twinkleStars,
   walkHop,
 } from "../anim";
+import { HUB, HUB_ART_KEY, uvToWorld } from "../hubLayout";
 import { ChipTray } from "../ui/ChipTray";
 import { PlaceHud } from "../ui/PlaceHud";
 import { CrewTalk } from "../ui/CrewTalk";
@@ -44,15 +45,11 @@ import { THEME } from "../theme";
 import { createRng } from "../../engine/rng";
 import {
   COMMS_COST,
-  LOSE_OXYGEN_AT,
-  LOSE_WATER_AT,
   SCIENCE_COST_PER_LEVEL,
   SCIENCE_LEVEL_MAX,
   SCIENCE_POINTS_PLAIN,
   SCIENCE_POINTS_RIM,
   SHIELD_MATERIAL_COST,
-  START_OXYGEN,
-  START_WATER,
 } from "../../engine/constants";
 import { plannedPowerCost } from "../../ui/powerMath";
 
@@ -77,24 +74,20 @@ export class BaseWorldScene extends Phaser.Scene {
   private dishImg: Phaser.GameObjects.Image | null = null;
   private dishSpin: Phaser.Tweens.Tween | null = null;
   private panelsImg: Phaser.GameObjects.Image | null = null;
-  private plantLeaves: Phaser.GameObjects.Ellipse[] = [];
-  private waterFill: Phaser.GameObjects.Rectangle | null = null;
-  private oxyFill: Phaser.GameObjects.Rectangle | null = null;
-  private bubbleTimer: Phaser.Time.TimerEvent | null = null;
+  private roverImg: Phaser.GameObjects.Image | null = null;
   private chipTray!: ChipTray;
   private crewTalk!: CrewTalk;
   private alertText!: Phaser.GameObjects.Text;
   private alertPulse: Phaser.Tweens.Tween | null = null;
   private novaBubble!: Phaser.GameObjects.Text;
-  private shieldRing: Phaser.GameObjects.Arc | null = null;
+  private shieldRing: Phaser.GameObjects.Image | null = null;
   private crateRoots: Phaser.GameObjects.Container[] = [];
+  private doorGlows: Phaser.GameObjects.Image[] = [];
   private lastFootstep = 0;
   private lastDay = -1;
   private ending = false;
   private walkTarget: { x: number; y: number } | null = null;
   private doorCooldown = 0;
-  private lastOxyOn: boolean | null = null;
-  private lastGreenhouse: boolean | null = null;
   private lastComms: boolean | null = null;
   private lastShield = -1;
   private spawnNear: string | null = null;
@@ -123,6 +116,7 @@ export class BaseWorldScene extends Phaser.Scene {
     this.doorCooldown = 400;
     fadeSlideIn(this, false);
     this.drag = new DragController(this);
+    ensureSoftPadTexture(this);
 
     let night = false;
     try {
@@ -136,55 +130,93 @@ export class BaseWorldScene extends Phaser.Scene {
     } catch {
       /* */
     }
-    paintMoonGround(this, W, H, night, createRng(seed));
-    this.add
-      .image(W / 2, H * 0.58, "surface")
-      .setDisplaySize(W * 0.85, H * 0.42)
-      .setAlpha(0.2)
-      .setDepth(1);
 
-    if (!night) {
-      this.add.ellipse(W * 0.88, H * 0.1, 70, 70, 0xffe08a, 0.5).setDepth(2);
-    } else {
+    // Full-bleed soft-pixel hub painting (Gemini) — one composition, no stacked boxes.
+    this.cameras.main.setBackgroundColor(0x6a7a88);
+    this.add
+      .image(W / 2, H / 2, HUB_ART_KEY)
+      .setDisplaySize(W, H)
+      .setDepth(0);
+    if (night) {
+      this.add.rectangle(0, 0, W, H, 0x1a2030, 0.42).setOrigin(0).setDepth(1);
       const rng = createRng(seed);
       const stars: Phaser.GameObjects.Arc[] = [];
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 16; i++) {
         stars.push(
-          this.add.circle(rng() * W, rng() * H * 0.3, 1.2, 0xffffff, 0.85).setDepth(2),
+          this.add
+            .circle(rng() * W, rng() * H * 0.32, 1.1 + rng(), 0xffffff, 0.85)
+            .setDepth(2),
         );
       }
       twinkleStars(this, stars);
     }
-    this.add.image(W * 0.08, H * 0.09, "earth").setDisplaySize(52, 52).setDepth(3);
+    this.add
+      .image(W * 0.07, H * 0.08, "earth")
+      .setDisplaySize(44, 44)
+      .setDepth(3)
+      .setAlpha(0.92);
 
-    this.addBuilding("home", "Crew home", W * 0.22, H * 0.42, "habitat", 96, 82);
-    this.addBuilding("greenhouse", "Greenhouse", W * 0.5, H * 0.38, "greenhouse", 90, 82);
-    this.addBuilding("lab", "Science lab", W * 0.78, H * 0.42, "labCottage", 90, 82);
+    // Soft door footprints on painted doors — navigation without brown rectangles.
+    this.addDoorHotspot("home", "Home", HUB.homeDoor, 0xf0a070, W, H);
+    this.addDoorHotspot("greenhouse", "Plants", HUB.greenhouseDoor, 0x8fa887, W, H);
+    this.addDoorHotspot("lab", "Lab", HUB.labDoor, 0x7aa7c4, W, H);
 
-    this.panelsImg = this.add.image(W * 0.34, H * 0.68, "panels").setDisplaySize(72, 44).setDepth(7);
-    this.dishImg = this.add.image(W * 0.58, H * 0.66, "dish").setDisplaySize(52, 52).setDepth(7);
-    this.add.image(W * 0.86, H * 0.68, "rover").setDisplaySize(64, 42).setDepth(7);
-    if (this.panelsImg) panelGlow(this, this.panelsImg, true);
+    // Living overlays only where motion sells the painting (not duplicate buildings).
+    const panelPos = uvToWorld(W, H, HUB.panels);
+    this.panelsImg = this.add
+      .image(panelPos.x, panelPos.y, "panels")
+      .setDisplaySize(78, 48)
+      .setAlpha(0.55)
+      .setDepth(7);
+    panelGlow(this, this.panelsImg, true);
 
+    const dishPos = uvToWorld(W, H, HUB.dish);
+    this.dishImg = this.add
+      .image(dishPos.x, dishPos.y, "dish")
+      .setDisplaySize(56, 56)
+      .setAlpha(0.0)
+      .setDepth(8);
+
+    const roverPos = uvToWorld(W, H, HUB.rover);
+    this.roverImg = this.add
+      .image(roverPos.x, roverPos.y - 8, "rover")
+      .setDisplaySize(70, 46)
+      .setAlpha(0.0)
+      .setDepth(8);
+    // Bounce a soft pad under the painted rover so drag targets feel alive.
+    const roverPad = this.add
+      .image(roverPos.x, roverPos.y + 10, "softPad")
+      .setDisplaySize(64, 28)
+      .setTint(0xe2b48a)
+      .setAlpha(0.45)
+      .setDepth(7);
+    roverIdleBounce(this, roverPad);
+
+    const home = uvToWorld(W, H, HUB.homeDoor);
     this.shieldRing = this.add
-      .circle(W * 0.22, H * 0.42, 58, 0x7ec8ff, 0.08)
-      .setStrokeStyle(2, 0xa8e6ff, 0.35)
+      .image(home.x, home.y - 36, "softPad")
+      .setDisplaySize(90, 48)
+      .setTint(0x7ec8ff)
+      .setAlpha(0.12)
       .setDepth(5);
 
-    this.buildTanks(W, H);
-    this.buildPlants(W, H);
     this.buildOutdoorJobs(W, H);
     this.buildMaterialCrates(W, H);
 
     const spawn = this.spawnPoint(W, H);
     this.player = this.physics.add
       .sprite(spawn.x, spawn.y, "nova")
-      .setDisplaySize(48, 64)
+      .setDisplaySize(46, 60)
       .setCollideWorldBounds(true)
       .setDepth(20);
-    this.player.body!.setSize(24, 18);
-    this.player.body!.setOffset(14, 44);
-    this.physics.world.setBounds(16, H * 0.36, W - 32, H * 0.5);
+    this.player.body!.setSize(22, 16);
+    this.player.body!.setOffset(14, 42);
+    this.physics.world.setBounds(
+      20,
+      H * HUB.walkMinV,
+      W - 40,
+      H * (HUB.walkMaxV - HUB.walkMinV),
+    );
 
     const sh = addShadow(this, this.player, 40);
     this.shadowSync = sh.sync;
@@ -203,7 +235,7 @@ export class BaseWorldScene extends Phaser.Scene {
       if (this.ending || this.crewTalk?.isOpen() || this.drag.dragging) return;
       this.walkTarget = {
         x: p.worldX,
-        y: Phaser.Math.Clamp(p.worldY, H * 0.4, H * 0.86),
+        y: Phaser.Math.Clamp(p.worldY, H * HUB.walkMinV, H * HUB.walkMaxV),
       };
     });
 
@@ -281,10 +313,11 @@ export class BaseWorldScene extends Phaser.Scene {
   }
 
   private spawnPoint(W: number, H: number) {
-    if (this.spawnNear === "home") return { x: W * 0.22, y: H * 0.62 };
-    if (this.spawnNear === "greenhouse") return { x: W * 0.5, y: H * 0.58 };
-    if (this.spawnNear === "lab") return { x: W * 0.78, y: H * 0.62 };
-    return { x: W * 0.5, y: H * 0.72 };
+    if (this.spawnNear === "home") return uvToWorld(W, H, { u: HUB.homeDoor.u, v: 0.78 });
+    if (this.spawnNear === "greenhouse")
+      return uvToWorld(W, H, { u: HUB.greenhouseDoor.u, v: 0.8 });
+    if (this.spawnNear === "lab") return uvToWorld(W, H, { u: HUB.labDoor.u, v: 0.78 });
+    return uvToWorld(W, H, HUB.spawn);
   }
 
   private goPlace(room: "home" | "greenhouse" | "lab") {
@@ -296,41 +329,36 @@ export class BaseWorldScene extends Phaser.Scene {
     this.walkTarget = { x: d.x, y: d.y };
   }
 
-  private addBuilding(
+  /** Soft glowing footprint on a painted door — walk into it to enter. */
+  private addDoorHotspot(
     room: "home" | "greenhouse" | "lab",
     label: string,
-    x: number,
-    y: number,
-    key: string,
-    w: number,
-    h: number,
+    uv: { u: number; v: number },
+    tint: number,
+    W: number,
+    H: number,
   ) {
-    this.add.image(x, y, key).setDisplaySize(w, h).setDepth(6);
+    const { x, y } = uvToWorld(W, H, uv);
+    const glow = this.add
+      .image(x, y + 6, "softPad")
+      .setDisplaySize(72, 34)
+      .setTint(tint)
+      .setAlpha(0.55)
+      .setDepth(9);
+    pulseDoorGlow(this, glow);
+    this.doorGlows.push(glow);
     this.add
-      .text(x, y - h * 0.52, label, {
+      .text(x, y - 22, label, {
         fontFamily: THEME.fontDisplay,
-        fontSize: "11px",
+        fontSize: "12px",
         color: THEME.ink,
         backgroundColor: THEME.cream,
-        padding: { x: 5, y: 2 },
+        padding: { x: 6, y: 2 },
       })
       .setOrigin(0.5)
       .setDepth(25);
-    const doorY = y + h * 0.38;
-    this.add
-      .rectangle(x, doorY, 36, 22, 0x5a4030, 0.95)
-      .setStrokeStyle(2, 0xffe08a, 0.8)
-      .setDepth(9);
-    this.add
-      .text(x, doorY, "DOOR", {
-        fontFamily: THEME.font,
-        fontSize: "9px",
-        color: THEME.cream,
-      })
-      .setOrigin(0.5)
-      .setDepth(10);
-    this.doors.push({ room, x, y: doorY, r: 28 });
-    if (room === "home") this.homeDoorPos = { x, y: doorY };
+    this.doors.push({ room, x, y, r: 34 });
+    if (room === "home") this.homeDoorPos = { x, y };
   }
 
   private enterRoom(room: "home" | "greenhouse" | "lab") {
@@ -356,37 +384,18 @@ export class BaseWorldScene extends Phaser.Scene {
     });
   }
 
-  private buildTanks(W: number, H: number) {
-    const mk = (x: number, label: string, color: number) => {
-      this.add.rectangle(x, H * 0.55, 22, 54, 0x2a2218, 0.9).setStrokeStyle(2, THEME.line, 0.3).setDepth(8);
-      const fill = this.add.rectangle(x, H * 0.55 + 24, 16, 48, color, 0.9).setOrigin(0.5, 1).setDepth(9);
-      this.add.text(x, H * 0.55 - 34, label, { fontFamily: THEME.font, fontSize: "9px", color: THEME.cream }).setOrigin(0.5).setDepth(10);
-      return fill;
-    };
-    this.waterFill = mk(W * 0.06, "H₂O", 0x3a7ca5);
-    this.oxyFill = mk(W * 0.1, "O₂", 0x2f7d4a);
-  }
-
-  private buildPlants(W: number, H: number) {
-    this.plantLeaves = [];
-    for (let i = 0; i < 3; i++) {
-      const x = W * (0.44 + i * 0.04);
-      const y = H * 0.5;
-      const leaf = this.add.ellipse(x, y, 22, 28, 0x8a6a3a).setDepth(8);
-      this.add.rectangle(x, y + 16, 16, 10, 0x6b4a2a).setDepth(8);
-      this.plantLeaves.push(leaf);
-    }
-  }
-
   private buildMaterialCrates(W: number, H: number) {
-    for (let i = 0; i < 3; i++) {
-      const c = this.add.container(W * 0.12 + i * 28, H * 0.78).setDepth(16);
-      const box = this.add.rectangle(0, 0, 22, 18, 0xb08968, 0.95).setStrokeStyle(2, THEME.line, 0.4);
-      const t = this.add.text(0, 0, "📦", { fontSize: "12px" }).setOrigin(0.5);
-      c.add([box, t]);
-      c.setSize(24, 20);
+    const base = uvToWorld(W, H, HUB.crates);
+    for (let i = 0; i < 2; i++) {
+      const c = this.add.container(base.x + i * 36, base.y).setDepth(16);
+      const img = this.add
+        .image(0, 0, "crates")
+        .setDisplaySize(40, 32)
+        .setOrigin(0.5);
+      c.add(img);
+      c.setSize(44, 36);
       c.setInteractive(
-        new Phaser.Geom.Rectangle(-12, -10, 24, 20),
+        new Phaser.Geom.Rectangle(-22, -18, 44, 36),
         Phaser.Geom.Rectangle.Contains,
       );
       c.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -400,7 +409,12 @@ export class BaseWorldScene extends Phaser.Scene {
           return;
         }
         p.event.stopPropagation();
-        this.drag.begin({ kind: "material", amount: SHIELD_MATERIAL_COST }, p.worldX, p.worldY, 0xb08968);
+        this.drag.begin(
+          { kind: "material", amount: SHIELD_MATERIAL_COST },
+          p.worldX,
+          p.worldY,
+          0xb08968,
+        );
       });
       this.crateRoots.push(c);
     }
@@ -412,17 +426,25 @@ export class BaseWorldScene extends Phaser.Scene {
         ? SCIENCE_POINTS_PLAIN
         : SCIENCE_POINTS_RIM;
 
-    this.radioPos = { x: W * 0.58, y: H * 0.78 };
+    const radio = uvToWorld(W, H, HUB.radio);
+    const rover = uvToWorld(W, H, HUB.rover);
+    const shield = uvToWorld(W, H, HUB.shield);
+    const home = uvToWorld(W, H, HUB.homeDoor);
+
+    this.radioPos = radio;
     this.addStation(
       new JobStation(this, {
         id: "radio",
-        x: W * 0.58,
-        y: H * 0.78,
+        x: radio.x,
+        y: radio.y,
         label: "Radio dish",
         costs: [{ icon: "⚡", value: -COMMS_COST }],
         benefits: [{ icon: "📡", value: "warn" }],
         accept: "chip",
         chipCost: COMMS_COST,
+        artKey: "radioConsole",
+        artW: 52,
+        artH: 44,
         getOn: () => bridge().getDecisions().comms,
         getFill: () => this.fills.radio ?? 0,
         onDrop: (p) =>
@@ -430,7 +452,7 @@ export class BaseWorldScene extends Phaser.Scene {
             bridge().patchDecisions({ comms: on });
             if (on) {
               audio.play("powerHum");
-              floatNumber(this, W * 0.58, H * 0.7, "Radio ON", THEME.sageInk);
+              floatNumber(this, radio.x, radio.y - 40, "Radio ON", THEME.sageInk);
               const tip = advanceTutorial("radio_chip");
               if (tip) bridge().setNovaLine(tip);
             }
@@ -442,8 +464,8 @@ export class BaseWorldScene extends Phaser.Scene {
     this.addStation(
       new JobStation(this, {
         id: "science",
-        x: W * 0.72,
-        y: H * 0.78,
+        x: rover.x,
+        y: rover.y,
         label: "Science walk",
         costs: [
           { icon: "⚡", value: -SCIENCE_COST_PER_LEVEL },
@@ -452,6 +474,7 @@ export class BaseWorldScene extends Phaser.Scene {
         benefits: [{ icon: "🔬", value: `+${sciPts}` }],
         accept: "chip",
         chipCost: 1,
+        // Pad only — painting already has the rover (no stacked cutout).
         getOn: () => bridge().getDecisions().scienceLevel > 0,
         onDrop: () => {
           const d = bridge().getDecisions();
@@ -465,9 +488,9 @@ export class BaseWorldScene extends Phaser.Scene {
             return false;
           }
           bridge().patchDecisions({ scienceLevel: next });
-          floatNumber(this, W * 0.72, H * 0.7, `+1 walk · risk`, THEME.rose);
+          floatNumber(this, rover.x, rover.y - 36, `+1 walk · risk`, THEME.rose);
           const storm = bridge().getEvent()?.stormSeverity !== undefined;
-          if (storm) floatNumber(this, W * 0.72, H * 0.64, "storm exposure!", THEME.rose);
+          if (storm) floatNumber(this, rover.x, rover.y - 54, "storm exposure!", THEME.rose);
           this.afterJob();
           return true;
         },
@@ -477,8 +500,8 @@ export class BaseWorldScene extends Phaser.Scene {
     this.addStation(
       new JobStation(this, {
         id: "shield",
-        x: W * 0.28,
-        y: H * 0.62,
+        x: shield.x,
+        y: shield.y,
         label: "Shield frame",
         costs: [{ icon: "📦", value: -SHIELD_MATERIAL_COST }],
         benefits: [{ icon: "🛡", value: "−risk" }],
@@ -495,8 +518,8 @@ export class BaseWorldScene extends Phaser.Scene {
             return false;
           }
           bridge().patchDecisions({ buildShield: true });
-          shieldShimmer(this, W * 0.22, H * 0.42, (bridge().getState().shieldLevel || 0) + 1);
-          floatNumber(this, W * 0.28, H * 0.55, "Shield +1 tonight", THEME.sageInk);
+          shieldShimmer(this, home.x, home.y - 20, (bridge().getState().shieldLevel || 0) + 1);
+          floatNumber(this, shield.x, shield.y - 36, "Shield +1 tonight", THEME.sageInk);
           this.syncShieldVisual(true);
           this.afterJob();
           return true;
@@ -504,12 +527,12 @@ export class BaseWorldScene extends Phaser.Scene {
       }),
     );
 
-    // Drop crew portraits (or Nova) onto Crew home door to shelter.
+    // Drop Nova onto Home door pad to shelter (storm days).
     this.addStation(
       new JobStation(this, {
         id: "crew_home_shelter",
-        x: W * 0.22,
-        y: H * 0.62,
+        x: home.x,
+        y: home.y + 8,
         label: "Shelter drop",
         costs: [{ icon: "👨‍🚀", value: 0 }],
         benefits: [{ icon: "🛡", value: "safer" }],
@@ -523,7 +546,6 @@ export class BaseWorldScene extends Phaser.Scene {
           }
           const ok = this.stormHud?.tryReceive(p.sourceId) ?? false;
           if (!ok && p.sourceId) {
-            // Nova herself counts as "all in" toggle for solo play.
             bridge().setSheltering(true);
             bridge().patchDecisions({ shelteredCrewCount: 3 });
             this.say("Nova ducks into Crew home.");
@@ -532,7 +554,7 @@ export class BaseWorldScene extends Phaser.Scene {
           }
           if (ok) {
             audio.play("shelterClose");
-            floatNumber(this, W * 0.22, H * 0.55, "Safe inside!", THEME.sageInk);
+            floatNumber(this, home.x, home.y - 30, "Safe inside!", THEME.sageInk);
             this.afterJob();
           }
           return ok;
@@ -602,12 +624,12 @@ export class BaseWorldScene extends Phaser.Scene {
     if (!force && lv === this.lastShield) return;
     this.lastShield = lv;
     if (this.shieldRing) {
-      this.shieldRing.setRadius(50 + lv * 10);
-      this.shieldRing.setAlpha(lv > 0 ? 0.18 : 0.06);
+      this.shieldRing.setDisplaySize(80 + lv * 14, 42 + lv * 6);
+      this.shieldRing.setAlpha(lv > 0 ? 0.28 : 0.1);
       if (lv > 0 && !reduceMotion()) {
         this.tweens.add({
           targets: this.shieldRing,
-          alpha: { from: 0.12, to: 0.28 },
+          alpha: { from: 0.16, to: 0.4 },
           duration: 900,
           yoyo: true,
           repeat: 2,
@@ -640,41 +662,27 @@ export class BaseWorldScene extends Phaser.Scene {
     const commsOn = Boolean(d.comms);
     if (force || commsOn !== this.lastComms) {
       this.lastComms = commsOn;
-      if (commsOn && !this.dishSpin && this.dishImg) {
-        this.dishSpin = this.tweens.add({
-          targets: this.dishImg,
-          angle: 360,
-          duration: reduceMotion() ? 1 : 4000,
-          repeat: -1,
-        });
-        if (reduceMotion()) this.dishSpin.pause();
-      } else if (!commsOn && this.dishSpin) {
-        this.dishSpin.stop();
+      if (commsOn && this.dishImg) {
+        this.dishImg.setAlpha(0.95);
+        if (!this.dishSpin) {
+          this.dishSpin = this.tweens.add({
+            targets: this.dishImg,
+            angle: 360,
+            duration: reduceMotion() ? 1 : 5200,
+            repeat: -1,
+            ease: "Linear",
+          });
+          if (reduceMotion()) this.dishSpin.pause();
+        }
+      } else if (!commsOn) {
+        this.dishSpin?.stop();
         this.dishSpin = null;
-        this.dishImg?.setAngle(0);
+        this.dishImg?.setAngle(0).setAlpha(0);
       }
-    }
-    const water01 = (st.water - LOSE_WATER_AT) / Math.max(1, START_WATER - LOSE_WATER_AT);
-    const oxy01 = (st.oxygen - LOSE_OXYGEN_AT) / Math.max(1, START_OXYGEN - LOSE_OXYGEN_AT);
-    this.waterFill?.setDisplaySize(16, Math.max(4, 48 * Phaser.Math.Clamp(water01, 0, 1)));
-    this.oxyFill?.setDisplaySize(16, Math.max(4, 48 * Phaser.Math.Clamp(oxy01, 0, 1)));
-    const oxyOn = Boolean(d.oxygenMaker);
-    if (force || oxyOn !== this.lastOxyOn) {
-      this.lastOxyOn = oxyOn;
-      this.bubbleTimer?.remove(false);
-      this.bubbleTimer = null;
-      if (oxyOn && this.oxyFill) {
-        this.bubbleTimer = oxygenBubbles(this, this.oxyFill.x, this.oxyFill.y - 30, true);
-      }
-    }
-    const plantsOn = Boolean(d.greenhouse);
-    if (force || plantsOn !== this.lastGreenhouse) {
-      this.lastGreenhouse = plantsOn;
-      for (const leaf of this.plantLeaves) setPlantStage(leaf, plantsOn ? 3 : 0);
     }
     const mats = st.materials;
     for (let i = 0; i < this.crateRoots.length; i++) {
-      this.crateRoots[i]!.setAlpha(mats >= SHIELD_MATERIAL_COST ? 1 : 0.35);
+      this.crateRoots[i]!.setAlpha(mats >= SHIELD_MATERIAL_COST ? 1 : 0.4);
     }
     this.syncShieldVisual(false);
   }

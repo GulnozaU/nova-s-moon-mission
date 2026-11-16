@@ -70,15 +70,19 @@ export function walkHop(
     if (vx < -4) sprite.setFlipX(true);
     if (vx > 4) sprite.setFlipX(false);
     if (moving) {
-      t += 0.48;
+      // Farm-sim cadence: soft hop every ~2 steps, squash on land.
+      t += 0.55;
       const bob = Math.sin(t);
-      // Squash/stretch + slight tilt while walking.
-      sprite.setScale(baseScaleX * (1 - bob * 0.06), baseScaleY * (1 + bob * 0.08));
-      sprite.setAngle(Phaser.Math.Clamp(vx * 0.025, -7, 7));
+      const land = bob > 0.65;
+      sprite.setScale(
+        baseScaleX * (land ? 1.08 : 1 - bob * 0.05),
+        baseScaleY * (land ? 0.9 : 1 + bob * 0.1),
+      );
+      sprite.setAngle(Phaser.Math.Clamp(vx * 0.03, -8, 8));
       dustCooldown -= 1;
       if (dustCooldown <= 0 && dustCallback && !reduceMotion()) {
         dustCallback(sprite.x, sprite.y + sprite.displayHeight * 0.35);
-        dustCooldown = 8;
+        dustCooldown = land ? 5 : 10;
       }
     } else {
       sprite.setAngle(0);
@@ -422,6 +426,118 @@ export function twinkleStars(
       delay: Math.random() * 800,
     });
   }
+}
+
+/**
+ * Soft radial drop pad (farm-sim ground marker) — not a hard ellipse outline.
+ * Generated once per scene texture cache.
+ */
+export function ensureSoftPadTexture(scene: Phaser.Scene, key = "softPad"): string {
+  if (scene.textures.exists(key)) return key;
+  const size = 72;
+  const g = scene.make.graphics({ x: 0, y: 0 }, false);
+  for (let i = 10; i >= 1; i--) {
+    const t = i / 10;
+    g.fillStyle(0xfff6d8, 0.035 + t * 0.05);
+    g.fillEllipse(size / 2, size / 2 + 4, size * t, size * 0.52 * t);
+  }
+  g.lineStyle(2, 0xffe08a, 0.35);
+  g.strokeEllipse(size / 2, size / 2 + 4, size * 0.78, size * 0.4);
+  g.generateTexture(key, size, size);
+  g.destroy();
+  return key;
+}
+
+/** Gentle door glow — Henry’s Farm “you can enter here” pulse. */
+export function pulseDoorGlow(
+  scene: Phaser.Scene,
+  target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite,
+) {
+  if (reduceMotion()) return null;
+  return scene.tweens.add({
+    targets: target,
+    alpha: { from: 0.35, to: 0.75 },
+    scaleX: { from: 0.95, to: 1.08 },
+    scaleY: { from: 0.9, to: 1.05 },
+    duration: 900,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.inOut",
+  });
+}
+
+/** Rover suspension bounce. */
+export function roverIdleBounce(
+  scene: Phaser.Scene,
+  img: Phaser.GameObjects.Image,
+) {
+  if (reduceMotion()) return null;
+  return scene.tweens.add({
+    targets: img,
+    y: img.y - 3,
+    angle: { from: -1.2, to: 1.2 },
+    duration: 1100,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.inOut",
+  });
+}
+
+/** Soft leaf sway for greenhouse trays. */
+export function plantSway(
+  scene: Phaser.Scene,
+  img: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite,
+  delay = 0,
+) {
+  if (reduceMotion()) return null;
+  return scene.tweens.add({
+    targets: img,
+    angle: { from: -5, to: 5 },
+    duration: 1400 + delay,
+    yoyo: true,
+    repeat: -1,
+    delay,
+    ease: "Sine.inOut",
+  });
+}
+
+/**
+ * Drought-field wheat motion: pivot at soil, staggered sine layers,
+ * slight stretch so tops lead the breeze (Henry’s Farm / Stardew feel).
+ */
+export function wheatFieldSway(
+  scene: Phaser.Scene,
+  imgs: Array<Phaser.GameObjects.Image | Phaser.GameObjects.Sprite>,
+) {
+  if (reduceMotion()) return;
+  imgs.forEach((img, i) => {
+    const ox = img.originX;
+    const oy = img.originY;
+    img.setOrigin(0.5, 1);
+    // Keep feet planted after origin change.
+    img.y += img.displayHeight * (1 - oy);
+    img.x += img.displayWidth * (0.5 - ox);
+    const amp = 3.5 + (i % 3) * 1.4;
+    scene.tweens.add({
+      targets: img,
+      angle: { from: -amp, to: amp },
+      scaleX: { from: 0.97, to: 1.04 },
+      duration: 1500 + (i % 4) * 280,
+      yoyo: true,
+      repeat: -1,
+      delay: i * 110,
+      ease: "Sine.inOut",
+    });
+    scene.tweens.add({
+      targets: img,
+      scaleY: { from: 0.99, to: 1.02 },
+      duration: 1900 + (i % 3) * 200,
+      yoyo: true,
+      repeat: -1,
+      delay: 80 + i * 90,
+      ease: "Sine.inOut",
+    });
+  });
 }
 
 /** Soft painted moon ground (smooth 2D, not pixel). */

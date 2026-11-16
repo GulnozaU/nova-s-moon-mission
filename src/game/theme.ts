@@ -1,5 +1,5 @@
 /**
- * Shared smooth 2D look — matches React UI (Baloo/Nunito), not pixel/Courier.
+ * Soft-pixel storybook look — Baloo/Nunito UI over Gemini hub painting.
  */
 export const THEME = {
   ink: "#3a3348",

@@ -121,7 +121,7 @@ export function MissionDashboard({
   return (
     <section className={`dash ${dayLit ? "is-day" : "is-night"}`}>
       <div className="dash-world">
-        <img className="dash-world__bg" src={ART.lunarSurface} alt="" />
+        <img className="dash-world__bg" src={ART.moonBaseHub} alt="" />
         <div className="dash-world__haze" />
         <div className="sky-cycle" />
         <img className="actor actor--earth sway" src={ART.earthMoon} alt="" />

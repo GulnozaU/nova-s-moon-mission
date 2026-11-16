@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { THEME } from "../theme";
-import { workingLoop } from "../anim";
+import { ensureSoftPadTexture, workingLoop } from "../anim";
 import type { DragKind, DragPayload, DropAccept } from "../drag/types";
 
 export type CostIcon = {
@@ -30,23 +30,28 @@ export type JobStationOpts = {
   onDrop: (payload: DragPayload) => boolean;
   /** Optional worker art key when powered. */
   workerKey?: string;
+  /** Optional machine / prop art sitting on the soft pad (not a rectangle). */
+  artKey?: string;
+  artW?: number;
+  artH?: number;
   isAvailable?: () => boolean;
 };
 
 /**
- * Drop target with icon+number cost/benefit, fill pips, and a worker when ON.
+ * Drop target — soft farm-sim pad + optional art prop (no hard geometric boxes).
  */
 export class JobStation {
   readonly id: string;
   readonly root: Phaser.GameObjects.Container;
   private opts: JobStationOpts;
   private radius: number;
-  private pad: Phaser.GameObjects.Ellipse;
+  private pad: Phaser.GameObjects.Image;
+  private prop: Phaser.GameObjects.Image | null = null;
   private label: Phaser.GameObjects.Text;
   private costText: Phaser.GameObjects.Text;
   private onBadge: Phaser.GameObjects.Text;
   private fillText: Phaser.GameObjects.Text;
-  private worker: Phaser.GameObjects.Image | Phaser.GameObjects.Ellipse | null = null;
+  private worker: Phaser.GameObjects.Image | null = null;
   private workerTween: Phaser.Tweens.Tween | null = null;
   private accept: DragKind[];
 
@@ -56,12 +61,22 @@ export class JobStation {
     this.radius = opts.radius ?? 34;
     this.accept = Array.isArray(opts.accept) ? opts.accept : [opts.accept];
 
+    const padKey = ensureSoftPadTexture(scene);
     this.root = scene.add.container(opts.x, opts.y).setDepth(14);
     this.pad = scene.add
-      .ellipse(0, 0, this.radius * 2.1, this.radius * 1.3, THEME.accent, 0.22)
-      .setStrokeStyle(2, THEME.line, 0.28);
+      .image(0, 8, padKey)
+      .setDisplaySize(this.radius * 2.4, this.radius * 1.35)
+      .setAlpha(0.7);
+
+    if (opts.artKey && scene.textures.exists(opts.artKey)) {
+      this.prop = scene.add
+        .image(0, -6, opts.artKey)
+        .setDisplaySize(opts.artW ?? 48, opts.artH ?? 40)
+        .setOrigin(0.5, 0.85);
+    }
+
     this.label = scene.add
-      .text(0, -this.radius - 6, opts.label, {
+      .text(0, -this.radius - (this.prop ? 18 : 4), opts.label, {
         fontFamily: THEME.fontDisplay,
         fontSize: "12px",
         color: THEME.ink,
@@ -70,7 +85,7 @@ export class JobStation {
       })
       .setOrigin(0.5, 1);
     this.costText = scene.add
-      .text(0, this.radius + 2, formatCostsBenefits(opts.costs, opts.benefits), {
+      .text(0, this.radius + 6, formatCostsBenefits(opts.costs, opts.benefits), {
         fontFamily: THEME.font,
         fontSize: "11px",
         color: THEME.inkSoft,
@@ -80,34 +95,39 @@ export class JobStation {
       })
       .setOrigin(0.5, 0);
     this.onBadge = scene.add
-      .text(0, -4, "", {
+      .text(0, this.prop ? -22 : -4, "", {
         fontFamily: THEME.fontDisplay,
         fontSize: "12px",
-        color: THEME.ink,
+        color: THEME.sageInk,
         fontStyle: "bold",
+        backgroundColor: THEME.cream,
+        padding: { x: 4, y: 1 },
       })
       .setOrigin(0.5);
     this.fillText = scene.add
-      .text(0, 10, "", {
+      .text(0, 14, "", {
         fontFamily: THEME.font,
         fontSize: "10px",
         color: THEME.inkSoft,
       })
       .setOrigin(0.5);
-    this.root.add([this.pad, this.label, this.costText, this.onBadge, this.fillText]);
+
+    const kids: Phaser.GameObjects.GameObject[] = [
+      this.pad,
+      this.label,
+      this.costText,
+      this.onBadge,
+      this.fillText,
+    ];
+    if (this.prop) kids.splice(1, 0, this.prop);
+    this.root.add(kids);
 
     if (opts.workerKey && scene.textures.exists(opts.workerKey)) {
       this.worker = scene.add
-        .image(0, -this.radius - 28, opts.workerKey)
-        .setDisplaySize(28, 36)
+        .image(18, -this.radius - 20, opts.workerKey)
+        .setDisplaySize(26, 34)
         .setVisible(false)
         .setDepth(15);
-      this.root.add(this.worker);
-    } else {
-      this.worker = scene.add
-        .ellipse(0, -this.radius - 22, 16, 22, 0xe8c4a8, 0.95)
-        .setStrokeStyle(1, THEME.line, 0.35)
-        .setVisible(false);
       this.root.add(this.worker);
     }
 
@@ -120,12 +140,13 @@ export class JobStation {
   }
 
   contains(px: number, py: number): boolean {
-    return Math.hypot(px - this.root.x, py - this.root.y) <= this.radius + 10;
+    return Math.hypot(px - this.root.x, py - this.root.y) <= this.radius + 12;
   }
 
   setHighlight(on: boolean) {
-    this.pad.setStrokeStyle(3, on ? 0xffe08a : THEME.line, on ? 0.95 : 0.28);
-    this.pad.setFillStyle(on ? 0xffe08a : THEME.accent, on ? 0.45 : 0.22);
+    this.pad.setTint(on ? 0xffe08a : 0xffffff);
+    this.pad.setAlpha(on ? 0.95 : 0.7);
+    if (this.prop) this.prop.setScale(on ? 1.08 : 1);
   }
 
   receive(payload: DragPayload): boolean {
@@ -138,7 +159,9 @@ export class JobStation {
     this.root.setVisible(available);
     const on = this.opts.getOn();
     this.onBadge.setText(on ? "ON" : "");
-    this.pad.setFillStyle(on ? THEME.good : THEME.accent, on ? 0.38 : 0.22);
+    this.pad.setTint(on ? 0xb8e0a8 : 0xffffff);
+    this.pad.setAlpha(on ? 0.9 : 0.65);
+    if (this.prop) this.prop.setAlpha(on ? 1 : 0.92);
     const need = this.opts.chipCost ?? 0;
     const fill = this.opts.getFill?.() ?? 0;
     if (!on && need > 1) {
@@ -151,7 +174,7 @@ export class JobStation {
     if (this.worker) {
       this.worker.setVisible(on);
       if (on && !this.workerTween) {
-        this.workerTween = workingLoop(this.root.scene, this.worker as Phaser.GameObjects.Image);
+        this.workerTween = workingLoop(this.root.scene, this.worker);
       } else if (!on && this.workerTween) {
         this.workerTween.stop();
         this.workerTween = null;
